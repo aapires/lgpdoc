@@ -1,0 +1,163 @@
+# Default anonymization policy
+# Strategies:
+#   replace   – substitute with a fixed placeholder label (no per-value index)
+#   pseudonym – stable deterministic fake name per unique original
+#   mask      – overwrite each character with mask_char
+#   suppress  – remove the span entirely
+#   indexed   – stable enumerated placeholder per unique value:
+#               [LABEL_01], [LABEL_02], ... The same value gets the same
+#               index everywhere it appears in the document.
+
+version: "1.0"
+
+entities:
+  private_person:
+    strategy: indexed
+    label: "[PESSOA]"
+
+  # Legal entities — companies and government bodies. Marker uses
+  # PESSOA_JUR (juridical person) to distinguish from the natural
+  # person above without breaking the marker parser regex (no hyphens).
+  private_company:
+    strategy: indexed
+    label: "[PESSOA_JUR]"
+
+  private_email:
+    strategy: indexed
+    label: "[EMAIL]"
+
+  private_phone:
+    strategy: indexed
+    label: "[TELEFONE]"
+
+  private_address:
+    strategy: indexed
+    label: "[ENDERECO]"
+
+  private_date:
+    strategy: indexed
+    label: "[DATA]"
+
+  private_url:
+    strategy: indexed
+    label: "[URL]"
+
+  account_number:
+    strategy: indexed
+    label: "[CONTA]"
+
+  cpf:
+    strategy: indexed
+    label: "[CPF]"
+
+  cnpj:
+    strategy: indexed
+    label: "[CNPJ]"
+
+  rg:
+    strategy: indexed
+    label: "[RG]"
+
+  cnh:
+    strategy: indexed
+    label: "[CNH]"
+
+  passaporte:
+    strategy: indexed
+    label: "[PASSAPORTE]"
+
+  titulo_eleitor:
+    strategy: indexed
+    label: "[TITULO_ELEITOR]"
+
+  pis:
+    strategy: indexed
+    label: "[PIS]"
+
+  ctps:
+    strategy: indexed
+    label: "[CTPS]"
+
+  sus:
+    strategy: indexed
+    label: "[SUS]"
+
+  oab:
+    strategy: indexed
+    label: "[OAB]"
+
+  crm:
+    strategy: indexed
+    label: "[CRM]"
+
+  crea:
+    strategy: indexed
+    label: "[CREA]"
+
+  placa:
+    strategy: indexed
+    label: "[PLACA]"
+
+  renavam:
+    strategy: indexed
+    label: "[RENAVAM]"
+
+  processo_cnj:
+    strategy: indexed
+    label: "[PROCESSO]"
+
+  inscricao_estadual:
+    strategy: indexed
+    label: "[IE]"
+
+  cep:
+    strategy: indexed
+    label: "[CEP]"
+
+  ip:
+    strategy: indexed
+    label: "[IP]"
+
+  financeiro:
+    strategy: indexed
+    label: "[VALOR]"
+
+  secret:
+    strategy: indexed
+    label: "[SEGREDO]"
+
+# ---------------------------------------------------------------------------
+# Verification stage — second pass + deterministic rules + risk scoring.
+# Each finding contributes its weight to the total score; thresholds map the
+# score to a level. Decisions: auto_approve | sample_review | manual_review.
+# Critical level is a visual signal — it still routes to manual_review, never
+# blocks the workflow.
+# ---------------------------------------------------------------------------
+verification:
+  weights:
+    # Second-pass entity types
+    private_email: 5
+    private_phone: 5
+    private_person: 4
+    private_address: 3
+    private_date: 2
+    private_url: 3
+    account_number: 100
+    secret: 100
+    # Deterministic rule IDs
+    cpf: 50
+    cnpj: 50
+    cep: 5
+    br_phone: 5
+    email: 5
+    jwt: 100
+    bearer_token: 100
+    private_key: 100
+    api_key: 100
+
+  thresholds:
+    medium: 10
+    high: 30
+    critical: 80
+
+  default_weight: 1

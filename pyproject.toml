@@ -1,0 +1,63 @@
+[build-system]
+requires = ["setuptools>=72", "wheel"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "anonymizer"
+version = "0.1.0"
+description = "Secure document anonymization with PII detection and redaction"
+requires-python = ">=3.11"
+dependencies = [
+    "pyyaml>=6.0",
+    "pydantic>=2.0",
+    "pypdf>=4.0",
+    "python-docx>=1.1",
+    "openpyxl>=3.1",
+    "striprtf>=0.0.26",
+]
+
+[project.optional-dependencies]
+dev = [
+    "pytest>=8.0",
+    "pytest-cov>=5.0",
+]
+# Install the real OPF model stack for local/production use.
+# Requires ~3 GB disk for the checkpoint and a compatible CUDA/CPU environment.
+ml = [
+    "opf @ git+https://github.com/openai/privacy-filter.git",
+    "torch>=2.0",
+    "transformers>=4.50",
+]
+# Install the FastAPI service layer.
+api = [
+    "fastapi>=0.110",
+    "uvicorn>=0.27",
+    "python-multipart>=0.0.9",
+    "sqlalchemy>=2.0",
+    "pydantic-settings>=2.0",
+    "httpx>=0.27",
+]
+# OCR support for scanned PDFs and standalone image uploads. The Python
+# deps below require the SYSTEM-level ``tesseract`` binary (with the
+# Portuguese language pack) plus ``poppler`` (used by ``pdf2image``).
+# On macOS:
+#   brew install tesseract tesseract-lang poppler
+# On Debian/Ubuntu:
+#   apt-get install tesseract-ocr tesseract-ocr-por poppler-utils
+ocr = [
+    "pytesseract>=0.3.10",
+    "pdf2image>=1.17",
+    "Pillow>=10.0",
+]
+
+[tool.setuptools.packages.find]
+where = ["src"]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+addopts = "--tb=short"
+pythonpath = ["src"]
+
+[tool.coverage.run]
+source = ["src/anonymizer"]
+omit = ["tests/*", "scripts/*"]
