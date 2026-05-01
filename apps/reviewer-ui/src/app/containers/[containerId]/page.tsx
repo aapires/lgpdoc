@@ -16,12 +16,13 @@ import {
 } from "@/lib/api";
 import type { Container, ContainerDocument } from "@/lib/types";
 
-const ACCEPT = ".txt,.md,.rtf,.pdf,.docx,.xlsx,.png,.jpg,.jpeg";
+const ACCEPT = ".txt,.md,.rtf,.pdf,.docx,.xlsx,.xls,.png,.jpg,.jpeg";
 
 const FORMAT_ICON: Record<string, string> = {
   pdf: "📕",
   docx: "📘",
   xlsx: "📊",
+  xls: "📊",
   txt: "📄",
   md: "📝",
 };

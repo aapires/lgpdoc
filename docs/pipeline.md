@@ -42,6 +42,7 @@ Input file
 | `.pdf`   | `PdfExtractor`    | Página (OCR fallback)  | Sim (1-based)     | Texto plano (sem extração estruturada) |
 | `.docx`  | `DocxExtractor`   | Parágrafo + tabela     | Não               | Markdown |
 | `.xlsx`  | `XlsxExtractor`   | Planilha (1 tabela md) | Sim (sheet index) | Markdown |
+| `.xls`   | `XlsExtractor`    | Planilha (1 tabela md) | Sim (sheet index) | Markdown |
 | `.png`   | `ImageExtractor`  | Bloco único (OCR)      | Não               | Texto plano |
 | `.jpg`   | `ImageExtractor`  | Bloco único (OCR)      | Não               | Texto plano |
 | `.jpeg`  | `ImageExtractor`  | Bloco único (OCR)      | Não               | Texto plano |

@@ -6,7 +6,7 @@ import { useRef, useState } from "react";
 import { uploadJob } from "@/lib/api";
 import type { JobMode } from "@/lib/types";
 
-const ACCEPT = ".txt,.md,.rtf,.pdf,.docx,.xlsx,.png,.jpg,.jpeg";
+const ACCEPT = ".txt,.md,.rtf,.pdf,.docx,.xlsx,.xls,.png,.jpg,.jpeg";
 
 // UI-only third option. The backend only knows the two real JobModes;
 // "comparison" reuses the anonymization pipeline and chains the
@@ -146,7 +146,7 @@ export function UploadCard({ onUploaded }: UploadCardProps) {
           </button>
         </p>
         <p className="dropzone-hint">
-          .txt · .md · .rtf · .pdf · .docx · .xlsx · .png · .jpg —
+          .txt · .md · .rtf · .pdf · .docx · .xlsx · .xls · .png · .jpg —
           até 50&nbsp;MB
         </p>
         {uploading && <p className="dropzone-status">⏳ Enviando…</p>}

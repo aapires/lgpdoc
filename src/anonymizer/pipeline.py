@@ -22,6 +22,7 @@ from .extractors.image import ImageExtractor
 from .extractors.pdf import PdfExtractor
 from .extractors.rtf import RtfExtractor
 from .extractors.txt import TxtExtractor
+from .extractors.xls import XlsExtractor
 from .extractors.xlsx import XlsxExtractor
 from .policy import Policy
 from .redactor import Redactor
@@ -37,6 +38,7 @@ _REGISTRY: dict[str, type[BaseExtractor]] = {
         PdfExtractor,
         DocxExtractor,
         XlsxExtractor,
+        XlsExtractor,
         ImageExtractor,
         RtfExtractor,
     ]

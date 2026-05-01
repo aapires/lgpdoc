@@ -125,7 +125,7 @@ export default function JobsPage() {
             <div className="empty-step">
               <div className="empty-step-num">1</div>
               <div>
-                <strong>Envie</strong> um arquivo (.txt .md .pdf .docx .xlsx)
+                <strong>Envie</strong> um arquivo (.txt .md .pdf .docx .xlsx .xls)
               </div>
             </div>
             <div className="empty-step">

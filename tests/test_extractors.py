@@ -12,6 +12,7 @@ from anonymizer.extractors.docx import DocxExtractor
 from anonymizer.extractors.pdf import PdfExtractor
 from anonymizer.extractors.rtf import RtfExtractor
 from anonymizer.extractors.txt import TxtExtractor
+from anonymizer.extractors.xls import XlsExtractor
 from anonymizer.extractors.xlsx import XlsxExtractor
 
 
@@ -230,6 +231,69 @@ class TestXlsxExtractor:
         md = result.blocks[0].text
         # The pipe in the cell content must be escaped so it doesn't
         # break the table.
+        assert r"A \| B" in md
+        assert r"valor com \| pipe" in md
+
+
+# ---------------------------------------------------------------------------
+# XLS (legacy Excel 97–2003)
+# ---------------------------------------------------------------------------
+
+class TestXlsExtractor:
+    def test_extracts_sheets_as_blocks(self, synthetic_xls: Path) -> None:
+        result = XlsExtractor().extract(synthetic_xls)
+        assert len(result.blocks) >= 1
+
+    def test_block_contains_cell_data(self, synthetic_xls: Path) -> None:
+        result = XlsExtractor().extract(synthetic_xls)
+        combined = " ".join(b.text for b in result.blocks)
+        assert "Jane Doe" in combined
+        assert "jane.doe@synthetic-example.org" in combined
+
+    def test_offsets_index_into_full_text(self, synthetic_xls: Path) -> None:
+        result = XlsExtractor().extract(synthetic_xls)
+        for block in result.blocks:
+            assert (
+                result.full_text[block.start_offset : block.end_offset]
+                == block.text
+            )
+
+    def test_sheet_rendered_as_markdown_table(
+        self, synthetic_xls: Path
+    ) -> None:
+        result = XlsExtractor().extract(synthetic_xls)
+        assert result.blocks
+        md = result.blocks[0].text
+        assert "| Name |" in md
+        assert "| --- |" in md
+        assert "Jane Doe" in md
+
+    def test_page_index_is_sheet_number(self, synthetic_xls: Path) -> None:
+        result = XlsExtractor().extract(synthetic_xls)
+        # Single sheet → first block tagged as sheet 1.
+        assert result.blocks[0].page == 1
+
+    def test_corrupt_xls_raises_unsupported(self, tmp_path: Path) -> None:
+        bad = tmp_path / "bad.xls"
+        bad.write_bytes(b"not xls")
+        with pytest.raises(UnsupportedFormatError):
+            XlsExtractor().extract(bad)
+
+    def test_pipe_in_cell_is_escaped(self, tmp_path: Path) -> None:
+        import xlwt
+
+        wb = xlwt.Workbook(encoding="utf-8")
+        ws = wb.add_sheet("leakage")
+        ws.write(0, 0, "Categoria")
+        ws.write(0, 1, "Anotação")
+        ws.write(1, 0, "A | B")
+        ws.write(1, 1, "valor com | pipe")
+
+        path = tmp_path / "pipe.xls"
+        wb.save(str(path))
+
+        result = XlsExtractor().extract(path)
+        md = result.blocks[0].text
         assert r"A \| B" in md
         assert r"valor com \| pipe" in md
 

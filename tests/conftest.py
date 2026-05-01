@@ -75,3 +75,25 @@ def synthetic_xlsx(tmp_path: Path) -> Path:
     path = tmp_path / "contacts.xlsx"
     wb.save(str(path))
     return path
+
+
+@pytest.fixture()
+def synthetic_xls(tmp_path: Path) -> Path:
+    import xlwt
+
+    wb = xlwt.Workbook(encoding="utf-8")
+    ws = wb.add_sheet("Contacts")
+    headers = ["Name", "Email", "Phone", "Account"]
+    rows = [
+        ["Jane Doe", "jane.doe@synthetic-example.org", "555-0100-4321", "4111-1111-1111-1111"],
+        ["Bob Smith", "bob.smith@fake-corp.org", "555-0200-9999", "4222-2222-2222-2222"],
+    ]
+    for col, value in enumerate(headers):
+        ws.write(0, col, value)
+    for row_idx, row in enumerate(rows, start=1):
+        for col, value in enumerate(row):
+            ws.write(row_idx, col, value)
+
+    path = tmp_path / "contacts.xls"
+    wb.save(str(path))
+    return path
