@@ -6,15 +6,13 @@ app construction and shared across requests through ``app.state``.
 from __future__ import annotations
 
 import logging
+from contextlib import asynccontextmanager
 
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import RedirectResponse
 
-from anonymizer.augmentations import (
-    CaseNormalizingClient,
-    make_augmented_client,
-)
+from anonymizer.augmentations import make_augmented_client
 from anonymizer.client import MockPrivacyFilterClient, PrivacyFilterClient
 from anonymizer.regex_only_client import RegexOnlyClient
 
@@ -23,9 +21,11 @@ from .containers.service import ContainerService
 from .db.database import Database
 from .db.models import JobModel
 from .jobs.service import JobService
+from .opf_manager import OPFManager, ToggledBaseClient
 from .routers.containers import router as containers_router
 from .routers.detector_comparison import router as detector_comparison_router
 from .routers.jobs import router as jobs_router
+from .routers.opf import router as opf_router
 from .routers.settings import router as settings_router
 from .settings_store import SettingsStore
 from .storage import Storage
@@ -34,42 +34,36 @@ logger = logging.getLogger(__name__)
 
 
 def _make_clients(
-    settings: Settings, store: SettingsStore
-) -> tuple[PrivacyFilterClient, PrivacyFilterClient, PrivacyFilterClient]:
-    """Build the three clients the app needs.
+    settings: Settings,
+    store: SettingsStore,
+    opf_manager: OPFManager,
+) -> tuple[PrivacyFilterClient, PrivacyFilterClient]:
+    """Build the augmented and regex-only clients shared by all requests.
 
-    Returns ``(opf_for_comparison, augmented, regex_only)``:
+    The "OPF side" of the diagnostic detector-comparison is no longer
+    pre-built here — comparison endpoints request it from
+    ``opf_manager`` at call time so they can ``ensure_loaded()`` first.
 
-    * ``opf_for_comparison`` — the model side of the diagnostic
-      detector-comparison. It's the OPF base wrapped by
-      ``CaseNormalizingClient`` so it sees ALL-CAPS Brazilian text the
-      same way the production pipeline does. Without this wrapper, OPF
-      misses every name written in caps and the diagnostic dramatically
-      understates the model's contribution. The regex augmentations
-      (``br_labeled_name``, ``br_cpf``, etc.) are *not* included on this
-      side — those belong to ``regex_only``.
-    * ``augmented`` — the production client (case normalisation + BR
-      augmentations + regex detectors), filtered by enabled kinds.
-    * ``regex_only`` — runs every deterministic regex detector and only
-      those. The "regex puro" side of the comparison.
+    Returns ``(augmented, regex_only)``:
+
+    * ``augmented`` — production client (case normalisation + BR
+      augmentations + regex detectors), built around a
+      :class:`ToggledBaseClient` so OPF can be enabled/disabled at
+      runtime without rebuilding the augmented wrapper.
+    * ``regex_only`` — every deterministic regex detector, no model.
+      Used by the "regex puro" side of the diagnostic comparison.
     """
-    if settings.use_mock_client:
-        logger.info("Using MockPrivacyFilterClient (regex-based, no model)")
-        base: PrivacyFilterClient = MockPrivacyFilterClient()
-    else:
-        from anonymizer.privacy_filter_client import OpenAIPrivacyFilterClient
-
-        logger.info("Using OpenAIPrivacyFilterClient (loading OPF model)")
-        base = OpenAIPrivacyFilterClient()
-
-    opf_for_comparison: PrivacyFilterClient = CaseNormalizingClient(base)
+    base: PrivacyFilterClient = ToggledBaseClient(
+        mock=MockPrivacyFilterClient(),
+        manager=opf_manager,
+    )
     augmented = make_augmented_client(
         base, get_enabled_kinds=store.get_enabled_kinds
     )
     regex_only: PrivacyFilterClient = RegexOnlyClient(
         get_enabled_kinds=store.get_enabled_kinds
     )
-    return opf_for_comparison, augmented, regex_only
+    return augmented, regex_only
 
 
 def create_app(settings: Settings | None = None) -> FastAPI:
@@ -79,7 +73,11 @@ def create_app(settings: Settings | None = None) -> FastAPI:
     database = Database(settings.db_url)
     database.create_all()
     settings_store = SettingsStore(settings.runtime_config_path)
-    opf_client, client, regex_client = _make_clients(settings, settings_store)
+    opf_manager = OPFManager(
+        available=not settings.use_mock_client,
+        use_mock_worker=settings.opf_use_mock_worker,
+    )
+    client, regex_client = _make_clients(settings, settings_store, opf_manager)
 
     # ------------------------------------------------------------------
     # Container lifecycle hooks for jobs that belong to a container.
@@ -132,15 +130,26 @@ def create_app(settings: Settings | None = None) -> FastAPI:
             settings=settings,
             storage=storage,
             client=client,
+            opf_manager=opf_manager,
+            settings_store=settings_store,
             on_processing_done=_on_processing_done,
             on_approved=_on_approved,
             on_rejected=_on_rejected,
         )
 
+    @asynccontextmanager
+    async def lifespan(app: FastAPI):
+        try:
+            yield
+        finally:
+            # Don't wait for in-flight jobs — uvicorn is already tearing down.
+            opf_manager.disable(wait_for_jobs=False)
+
     app = FastAPI(
         title="LGPDoc API",
         description="Local document anonymization service with PII detection and verification.",
         version="1.0.0",
+        lifespan=lifespan,
     )
     app.add_middleware(
         CORSMiddleware,
@@ -153,7 +162,7 @@ def create_app(settings: Settings | None = None) -> FastAPI:
     app.state.storage = storage
     app.state.database = database
     app.state.client = client
-    app.state.opf_client = opf_client
+    app.state.opf_manager = opf_manager
     app.state.regex_client = regex_client
     app.state.service_factory = service_factory
     app.state.settings_store = settings_store
@@ -170,4 +179,5 @@ def create_app(settings: Settings | None = None) -> FastAPI:
     app.include_router(settings_router)
     app.include_router(detector_comparison_router)
     app.include_router(containers_router)
+    app.include_router(opf_router)
     return app

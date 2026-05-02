@@ -42,7 +42,10 @@ def api_settings(tmp_path: Path) -> Settings:
         max_bytes=1 * 1024 * 1024,
         policy_path=POLICY_PATH,
         runtime_config_path=tmp_path / "runtime.json",
-        use_mock_client=True,
+        # OPF "available" but worker uses the regex mock — exercises the
+        # subprocess plumbing without torch/opf being installed.
+        use_mock_client=False,
+        opf_use_mock_worker=True,
     )
 
 
@@ -163,24 +166,24 @@ class TestComparisonNeverUsesCompositeClient:
         assert "opf_client.detect" in src
         assert "regex_client.detect" in src
 
-    def test_app_state_separates_three_clients(
+    def test_app_state_keeps_clients_separated(
         self, api_settings: Settings
     ) -> None:
-        """Production exposes three distinct clients on app.state, and
-        the comparison-side OPF is the case-normalised wrapper, never
-        the augmented one."""
-        from anonymizer.augmentations import (
-            CaseNormalizingClient,
-            _OverridingComposite,
-        )
+        """Production exposes the augmented composite plus an
+        ``OPFManager`` that owns the OPF subprocess. The diagnostic OPF
+        side is built lazily by the comparison endpoint (it wraps
+        ``opf_manager.acquire()`` in ``CaseNormalizingClient`` per call),
+        so it can never be the augmented composite by accident.
+        """
+        from anonymizer.augmentations import _OverridingComposite
 
         app = create_app(api_settings)
         with TestClient(app):
             # Production: augmented composite.
             assert isinstance(app.state.client, _OverridingComposite)
-            # Diagnostic OPF side: case-normalising wrapper, NOT augmented.
-            assert isinstance(app.state.opf_client, CaseNormalizingClient)
-            assert not isinstance(app.state.opf_client, _OverridingComposite)
+            # OPF lifecycle owner present and separate from production.
+            assert hasattr(app.state, "opf_manager")
+            assert app.state.opf_manager is not app.state.client
             # Regex side stays separate.
             from anonymizer.regex_only_client import RegexOnlyClient
             assert isinstance(app.state.regex_client, RegexOnlyClient)

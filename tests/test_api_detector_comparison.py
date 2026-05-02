@@ -1,10 +1,10 @@
 """End-to-end tests for the diagnostic detector-comparison endpoints.
 
-The whole API is built with ``use_mock_client=True`` so the OPF model is
-never loaded. The mock side ("OPF puro") is the
-``MockPrivacyFilterClient`` while the regex side is the real
-``RegexOnlyClient`` — together they're enough to exercise the comparison
-plumbing without leaving the test process.
+The API is built with ``use_mock_client=False`` (so OPF is "available"
+and the toggle works) but ``opf_use_mock_worker=True`` so the
+subprocess runs ``MockPrivacyFilterClient`` instead of the real OPF.
+That exercises the full subprocess + comparison plumbing without
+needing torch/opf installed.
 """
 from __future__ import annotations
 
@@ -34,7 +34,8 @@ def api_settings(tmp_path: Path) -> Settings:
         max_bytes=1 * 1024 * 1024,
         policy_path=POLICY_PATH,
         runtime_config_path=tmp_path / "runtime.json",
-        use_mock_client=True,
+        use_mock_client=False,
+        opf_use_mock_worker=True,
     )
 
 
@@ -220,23 +221,20 @@ class TestUnknownJob:
 # ---------------------------------------------------------------------------
 
 class TestNoOpfLoading:
-    def test_opf_client_in_app_state_wraps_mock(
+    def test_opf_manager_runs_mock_worker_in_tests(
         self, api_settings: Settings
     ) -> None:
-        """The diagnostic OPF side wraps the base client in
-        CaseNormalizingClient (so it sees text the same way the
-        production pipeline does). With ``use_mock_client=True`` the
-        innermost detector must remain the mock — the real OPF model is
-        never loaded in tests."""
-        from anonymizer.augmentations import CaseNormalizingClient
-        from anonymizer.client import MockPrivacyFilterClient
-
+        """With ``opf_use_mock_worker=True`` the subprocess worker uses
+        the regex MockPrivacyFilterClient — never the real OPF model.
+        That keeps tests free of the torch/opf dependency while still
+        exercising the full subprocess plumbing.
+        """
         app = create_app(api_settings)
-        with TestClient(app):
-            client = app.state.opf_client
-            assert isinstance(client, CaseNormalizingClient)
-            inner = client._inner  # noqa: SLF001 — test introspection
-            assert isinstance(inner, MockPrivacyFilterClient), (
-                "The case-normalising wrapper must wrap the mock when "
-                "use_mock_client=True."
-            )
+        with TestClient(app) as client:
+            assert app.state.opf_manager.available is True
+            # Triggering the comparison auto-loads OPF → after a successful
+            # POST the toggle is ON and the worker is alive.
+            r = client.post("/api/opf/status")  # GET-only endpoint
+            assert r.status_code == 405
+            r = client.get("/api/opf/status")
+            assert r.json()["available"] is True

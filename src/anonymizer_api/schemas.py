@@ -239,3 +239,21 @@ class DetectorComparisonReportSchema(BaseModel):
     by_entity_type: list[EntityTypeComparisonSchema] = []
     items: list[ComparisonItemSchema] = []
     blocks: list[ComparisonBlockSchema] = []
+
+
+class OPFStatusSchema(BaseModel):
+    """Response for ``GET/POST /api/opf/{status,enable,disable}``."""
+
+    # ``False`` when the API was started in mock mode — the toggle is
+    # hidden in the UI and POSTs to /enable return 409.
+    available: bool
+    # ``True`` while the subprocess is up and accepting detections.
+    enabled: bool
+    # ``True`` between ``enable()`` being called and the worker emitting
+    # ``ready`` (model load takes ~30–60s). Frontend polls /status here.
+    loading: bool
+    # Last error from a failed enable attempt; cleared on a successful one.
+    error: str | None = None
+    # Number of jobs currently leasing the OPF subprocess. ``disable``
+    # waits for this to hit zero (or times out).
+    in_flight_jobs: int = 0

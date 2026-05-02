@@ -140,6 +140,63 @@ header.app .nav a.active {
   background: var(--accent-soft);
   color: var(--accent);
 }
+header.app .header-right {
+  display: inline-flex;
+  align-items: center;
+  gap: 16px;
+}
+
+/* OPF runtime toggle — three states (off / loading / on). */
+.opf-toggle {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  padding: 6px 12px;
+  border-radius: var(--radius-sm);
+  border: 1px solid var(--border);
+  background: var(--surface);
+  color: var(--text-secondary);
+  font-size: 12.5px;
+  font-weight: 500;
+  cursor: pointer;
+  transition: background 0.15s, border-color 0.15s, color 0.15s;
+}
+.opf-toggle:hover:not(:disabled) {
+  background: var(--bg);
+  color: var(--text);
+}
+.opf-toggle:disabled {
+  cursor: progress;
+  opacity: 0.85;
+}
+.opf-toggle .opf-dot {
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  background: #b8b8b8;
+  flex: 0 0 auto;
+}
+.opf-toggle.opf-off .opf-dot { background: #b8b8b8; }
+.opf-toggle.opf-on {
+  border-color: #1f8b4c;
+  color: #1f8b4c;
+}
+.opf-toggle.opf-on .opf-dot {
+  background: #1f8b4c;
+  box-shadow: 0 0 0 2px rgba(31, 139, 76, 0.18);
+}
+.opf-toggle.opf-loading {
+  border-color: #c79100;
+  color: #8a6500;
+}
+.opf-toggle.opf-loading .opf-dot {
+  background: #e0a800;
+  animation: opf-pulse 1.0s ease-in-out infinite;
+}
+@keyframes opf-pulse {
+  0%, 100% { opacity: 0.4; }
+  50%      { opacity: 1.0; }
+}
 
 /* ----------------------------------------------------------------------- */
 /* Cards                                                                    */

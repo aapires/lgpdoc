@@ -18,6 +18,7 @@ from sqlalchemy.orm import Session
 
 import re
 
+from anonymizer.augmentations import make_augmented_client
 from anonymizer.client import PrivacyFilterClient
 from anonymizer.detector_comparison import (
     ComparisonBlock,
@@ -128,6 +129,8 @@ class JobService:
         storage: Storage,
         client: PrivacyFilterClient,
         *,
+        opf_manager: "Any | None" = None,
+        settings_store: "Any | None" = None,
         on_processing_done: "Callable[[Session, JobModel], None] | None" = None,
         on_approved: "Callable[[Session, JobModel], None] | None" = None,
         on_rejected: "Callable[[Session, JobModel], None] | None" = None,
@@ -136,6 +139,11 @@ class JobService:
         self.settings = settings
         self.storage = storage
         self.client = client
+        # opf_manager + settings_store are optional so existing tests that
+        # build JobService directly with a single client still work — those
+        # paths skip the OPF lease and use the supplied client as-is.
+        self.opf_manager = opf_manager
+        self.settings_store = settings_store
         self.jobs = JobRepository(db)
         self.spans = SpanRepository(db)
         self.reviews = ReviewRepository(db)
@@ -226,37 +234,56 @@ class JobService:
         self.jobs.update(job_id, status=STATUS_PROCESSING)
         logger.info("Processing started job_id=%s", job_id)
 
+        # Snapshot the detector at job start so toggling OPF off mid-job
+        # doesn't change the contract — this job runs to completion with
+        # whatever was active when it began. The lease keeps the OPF
+        # subprocess alive until release(); ``disable()`` will wait.
+        leased_base = (
+            self.opf_manager.acquire() if self.opf_manager is not None else None
+        )
+        if leased_base is not None and self.settings_store is not None:
+            run_client: PrivacyFilterClient = make_augmented_client(
+                leased_base,
+                get_enabled_kinds=self.settings_store.get_enabled_kinds,
+            )
+        else:
+            run_client = self.client
+
         try:
-            policy = Policy.from_yaml(self.settings.policy_path)
-            output_dir = self.storage.output_for(job_id)
-            pipeline = DocumentPipeline(
-                client=self.client,
-                policy=policy,
-                output_dir=output_dir,
-                max_bytes=self.settings.max_bytes,
-            )
-            result = pipeline.run(
-                Path(job.quarantine_path),
-                policy_path=str(self.settings.policy_path),
-            )
-        except (UnsupportedFormatError, FileTooLargeError) as exc:
-            self.jobs.update(
-                job_id,
-                status=STATUS_FAILED,
-                error_message=str(exc),
-                completed_at=datetime.now(timezone.utc),
-            )
-            logger.error("Processing failed job_id=%s reason=%s", job_id, exc)
-            return
-        except Exception as exc:  # noqa: BLE001 — record and continue
-            self.jobs.update(
-                job_id,
-                status=STATUS_FAILED,
-                error_message=f"{type(exc).__name__}: {exc}",
-                completed_at=datetime.now(timezone.utc),
-            )
-            logger.exception("Unexpected processing error job_id=%s", job_id)
-            return
+            try:
+                policy = Policy.from_yaml(self.settings.policy_path)
+                output_dir = self.storage.output_for(job_id)
+                pipeline = DocumentPipeline(
+                    client=run_client,
+                    policy=policy,
+                    output_dir=output_dir,
+                    max_bytes=self.settings.max_bytes,
+                )
+                result = pipeline.run(
+                    Path(job.quarantine_path),
+                    policy_path=str(self.settings.policy_path),
+                )
+            except (UnsupportedFormatError, FileTooLargeError) as exc:
+                self.jobs.update(
+                    job_id,
+                    status=STATUS_FAILED,
+                    error_message=str(exc),
+                    completed_at=datetime.now(timezone.utc),
+                )
+                logger.error("Processing failed job_id=%s reason=%s", job_id, exc)
+                return
+            except Exception as exc:  # noqa: BLE001 — record and continue
+                self.jobs.update(
+                    job_id,
+                    status=STATUS_FAILED,
+                    error_message=f"{type(exc).__name__}: {exc}",
+                    completed_at=datetime.now(timezone.utc),
+                )
+                logger.exception("Unexpected processing error job_id=%s", job_id)
+                return
+        finally:
+            if leased_base is not None and self.opf_manager is not None:
+                self.opf_manager.release(leased_base)
 
         # Persist spans into DB for queryability.
         span_rows = [

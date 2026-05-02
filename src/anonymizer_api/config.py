@@ -20,7 +20,12 @@ class Settings(BaseSettings):
     policy_path: Path = Path("./policies/default.yaml")
     runtime_config_path: Path = Path("./var/runtime_config.json")
     # Use the regex MockPrivacyFilterClient instead of OPF — fast, no model download.
+    # Implies opf_manager.available=False; the runtime toggle is hidden in the UI.
     use_mock_client: bool = False
+    # When True, the OPF subprocess uses MockPrivacyFilterClient instead of the
+    # real OPF model. Tests-only — exercises the subprocess plumbing without
+    # requiring torch/opf to be installed.
+    opf_use_mock_worker: bool = False
     # Origins allowed by CORS — defaults cover the Next.js dev server.
     cors_origins: list[str] = [
         "http://localhost:3000",

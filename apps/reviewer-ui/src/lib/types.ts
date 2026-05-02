@@ -357,3 +357,12 @@ export interface PseudonymizedManualRedactionResult {
   marker_created: boolean;
   validation: ContainerValidationSummary;
 }
+
+export interface OpfStatus {
+  available: boolean;
+  enabled: boolean;
+  loading: boolean;
+  error: string | null;
+  in_flight_jobs: number;
+}
+

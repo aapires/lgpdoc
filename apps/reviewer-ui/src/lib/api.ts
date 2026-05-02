@@ -20,6 +20,7 @@ import type {
   DetectorComparisonReport,
   Job,
   JobMode,
+  OpfStatus,
   PseudonymizedManualRedactionResult,
   PseudonymizedReviewPayload,
   Report,
@@ -836,4 +837,31 @@ export function recommendedAction(job: Job): {
       // left in older SQLite databases). Treat them as inspectable.
       return { label: "Inspecionar", href: `/jobs/${job.job_id}` };
   }
+}
+
+// ---------------------------------------------------------------------------
+// OPF runtime toggle
+// ---------------------------------------------------------------------------
+
+const MOCK_OPF_STATUS: OpfStatus = {
+  available: false,
+  enabled: false,
+  loading: false,
+  error: null,
+  in_flight_jobs: 0,
+};
+
+export async function getOpfStatus(): Promise<OpfStatus> {
+  if (USE_MOCKS) return MOCK_OPF_STATUS;
+  return fetchJSON<OpfStatus>(`${BASE}/api/opf/status`);
+}
+
+export async function enableOpf(): Promise<OpfStatus> {
+  if (USE_MOCKS) return MOCK_OPF_STATUS;
+  return fetchJSON<OpfStatus>(`${BASE}/api/opf/enable`, { method: "POST" });
+}
+
+export async function disableOpf(): Promise<OpfStatus> {
+  if (USE_MOCKS) return MOCK_OPF_STATUS;
+  return fetchJSON<OpfStatus>(`${BASE}/api/opf/disable`, { method: "POST" });
 }

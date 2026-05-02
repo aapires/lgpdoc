@@ -60,7 +60,10 @@ def api_settings(tmp_path: Path) -> Settings:
         max_bytes=1 * 1024 * 1024,
         policy_path=POLICY_PATH,
         runtime_config_path=tmp_path / "runtime.json",
-        use_mock_client=True,
+        # OPF "available" but worker uses the regex mock, so detector
+        # comparison can run without torch/opf installed.
+        use_mock_client=False,
+        opf_use_mock_worker=True,
     )
 
 
