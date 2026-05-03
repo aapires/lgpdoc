@@ -27,6 +27,7 @@ from dataclasses import dataclass
 
 from anonymizer.client import MockPrivacyFilterClient, PrivacyFilterClient
 from anonymizer.models import DetectedSpan
+from anonymizer.regex_fallback_client import RegexFallbackClient
 from anonymizer.subprocess_opf_client import OPFWorkerError, SubprocessOPFClient
 
 logger = logging.getLogger(__name__)
@@ -50,17 +51,11 @@ class ToggledBaseClient(PrivacyFilterClient):
     off only swaps the model side.
     """
 
-    def __init__(
-        self,
-        mock: PrivacyFilterClient,
-        manager: "OPFManager",
-    ) -> None:
-        self._mock = mock
+    def __init__(self, manager: "OPFManager") -> None:
         self._manager = manager
 
     def detect(self, text: str) -> list[DetectedSpan]:
-        target = self._manager.current_base()
-        return target.detect(text)
+        return self._manager.current_base().detect(text)
 
 
 class OPFManager:
@@ -74,11 +69,23 @@ class OPFManager:
         self,
         *,
         available: bool,
-        mock_client: PrivacyFilterClient | None = None,
+        fallback_client: PrivacyFilterClient | None = None,
         use_mock_worker: bool = False,
     ) -> None:
         self._available = available
-        self._mock = mock_client or MockPrivacyFilterClient()
+        # ``_fallback`` is the base used when OPF is OFF. Defaults to
+        # ``RegexFallbackClient`` (email-only) — anything noisier (loose
+        # name heuristics) creates phantom detections once the augmented
+        # case-normalisation runs over caps-heavy Brazilian docs.
+        # In tests (``use_mock_worker=True``) the fallback is the regex
+        # ``MockPrivacyFilterClient`` so existing test fixtures keep
+        # detecting names without spinning up the OPF subprocess.
+        if fallback_client is not None:
+            self._fallback: PrivacyFilterClient = fallback_client
+        elif use_mock_worker:
+            self._fallback = MockPrivacyFilterClient()
+        else:
+            self._fallback = RegexFallbackClient()
         self._use_mock_worker = use_mock_worker
 
         self._lock = threading.RLock()
@@ -119,7 +126,7 @@ class OPFManager:
         with self._lock:
             if self._enabled and self._client is not None and self._client.is_running():
                 return self._client
-            return self._mock
+            return self._fallback
 
     # ------------------------------------------------------------------
     # Toggle
@@ -215,7 +222,7 @@ class OPFManager:
             if self._enabled and self._client is not None and self._client.is_running():
                 self._refcount += 1
                 return self._client
-            return self._mock
+            return self._fallback
 
     def release(self, leased: PrivacyFilterClient) -> None:
         """Release a lease taken via ``acquire()``.
@@ -224,7 +231,7 @@ class OPFManager:
         the exact instance returned by ``acquire()``.
         """
         with self._lock:
-            if leased is self._mock:
+            if leased is self._fallback:
                 return
             if self._refcount <= 0:
                 logger.error("release() called with refcount already 0")

@@ -151,6 +151,29 @@ class TestDetectBRLabeledNames:
         assert len(spans) == 1
         assert text[spans[0].start:spans[0].end] == "GUSTAVO SOARES"
 
+    def test_honorific_labels(self) -> None:
+        """Honorifics (Sr./Sra./Dr./Dra. + full forms) introduce names too,
+        with or without the trailing period."""
+        cases = [
+            ("Sr. Carlos Souza concordou.", "Carlos Souza"),
+            ("Sr Marcelo Tavares assinou.", "Marcelo Tavares"),
+            ("Sra. Beatriz Lima.", "Beatriz Lima"),
+            ("Sra Beatriz Lima.", "Beatriz Lima"),
+            ("Senhor Rafael Pinheiro veio.", "Rafael Pinheiro"),
+            ("Senhora Patricia Andrade veio.", "Patricia Andrade"),
+            ("Dr. Bruno Gomes assina.", "Bruno Gomes"),
+            ("Dra. Camila Rios assina.", "Camila Rios"),
+            ("Dr Lucas Albuquerque assina.", "Lucas Albuquerque"),
+            # The full-form Doutor/Doutora were already covered.
+            ("Doutor Andre Fernandes opinou.", "Andre Fernandes"),
+        ]
+        for text, expected in cases:
+            spans = detect_br_labeled_names(text)
+            assert spans, f"no match for: {text!r}"
+            assert any(
+                text[s.start : s.end] == expected for s in spans
+            ), f"text={text!r} got={[text[s.start:s.end] for s in spans]}"
+
     def test_no_match_without_label(self) -> None:
         spans = detect_br_labeled_names("ALEXANDRE ANDRADE PIRES went home")
         assert spans == []

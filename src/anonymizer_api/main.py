@@ -13,7 +13,7 @@ from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import RedirectResponse
 
 from anonymizer.augmentations import make_augmented_client
-from anonymizer.client import MockPrivacyFilterClient, PrivacyFilterClient
+from anonymizer.client import PrivacyFilterClient
 from anonymizer.regex_only_client import RegexOnlyClient
 
 from .config import Settings
@@ -53,10 +53,7 @@ def _make_clients(
     * ``regex_only`` — every deterministic regex detector, no model.
       Used by the "regex puro" side of the diagnostic comparison.
     """
-    base: PrivacyFilterClient = ToggledBaseClient(
-        mock=MockPrivacyFilterClient(),
-        manager=opf_manager,
-    )
+    base: PrivacyFilterClient = ToggledBaseClient(manager=opf_manager)
     augmented = make_augmented_client(
         base, get_enabled_kinds=store.get_enabled_kinds
     )

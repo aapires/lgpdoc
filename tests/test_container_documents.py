@@ -48,7 +48,10 @@ def api_settings(tmp_path: Path) -> Settings:
         max_bytes=1 * 1024 * 1024,
         policy_path=POLICY_PATH,
         runtime_config_path=tmp_path / "runtime.json",
-        use_mock_client=True,
+        # The fallback client (when OPF is OFF) is the regex mock so
+        # tests still detect names without enabling the subprocess.
+        use_mock_client=False,
+        opf_use_mock_worker=True,
     )
 
 

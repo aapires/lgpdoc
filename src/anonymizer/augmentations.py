@@ -196,6 +196,11 @@ _BR_BASE_LABEL = (
     r"doutor|doutora|"
 
     # ------------------------------------------------------------------
+    # Honorifics (period optional — "Sr." and "Sr Joao Silva" both work)
+    # ------------------------------------------------------------------
+    r"senhor|senhora|sr\.?|sra\.?|dr\.?|dra\.?|"
+
+    # ------------------------------------------------------------------
     # Generic fallback (must come last — most generic match)
     # ------------------------------------------------------------------
     r"nome"
