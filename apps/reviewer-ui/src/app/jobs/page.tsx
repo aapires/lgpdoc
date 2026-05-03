@@ -5,6 +5,7 @@ import { useCallback, useEffect, useRef, useState } from "react";
 
 import { deleteJob, listJobs, recommendedAction } from "@/lib/api";
 import type { Job } from "@/lib/types";
+import { OpfModeBadge } from "@/components/OpfModeBadge";
 import { ModeBadge, RiskBadge, StatusBadge } from "@/components/StatusBadge";
 import { UploadCard } from "@/components/UploadCard";
 
@@ -200,6 +201,7 @@ export default function JobsPage() {
                     <StatusBadge status={j.status} />
                     {j.risk_level && <RiskBadge level={j.risk_level} />}
                     <ModeBadge mode={j.mode} />
+                    <OpfModeBadge opfUsed={j.opf_used} />
                   </div>
 
                   <div className="job-card-actions">

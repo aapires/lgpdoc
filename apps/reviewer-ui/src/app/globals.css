@@ -335,6 +335,8 @@ header.app .header-right {
 .badge-high     { color: var(--orange); background: var(--orange-bg); }
 .badge-critical { color: var(--red);    background: var(--red-bg); }
 .badge-neutral  { color: var(--text-secondary); background: var(--gray-bg); }
+.badge-opf-on   { color: #1f8b4c; background: rgba(31, 139, 76, 0.12); }
+.badge-opf-off  { color: var(--text-secondary); background: var(--gray-bg); border: 1px dashed var(--border-strong); }
 
 /* ----------------------------------------------------------------------- */
 /* Inputs                                                                   */

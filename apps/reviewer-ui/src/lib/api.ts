@@ -110,6 +110,7 @@ export async function uploadJob(
       updated_at: new Date().toISOString(),
       completed_at: null,
       error_message: null,
+      opf_used: null,
     };
     MOCK_JOBS.unshift(newJob);
     return { job_id: id, status: "processing", created_at: newJob.created_at };
@@ -358,6 +359,15 @@ export async function deleteJob(jobId: string): Promise<void> {
     }
     throw new Error(detail);
   }
+}
+
+export async function reprocessJob(jobId: string): Promise<Job> {
+  if (USE_MOCKS) {
+    const job = MOCK_JOBS.find((j) => j.job_id === jobId);
+    if (!job) throw new Error("Job not found");
+    return { ...job, status: "pending" };
+  }
+  return fetchJSON<Job>(`${BASE}/jobs/${jobId}/reprocess`, { method: "POST" });
 }
 
 export function downloadUrl(jobId: string): string {

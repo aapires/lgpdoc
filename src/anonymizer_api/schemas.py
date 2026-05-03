@@ -52,6 +52,9 @@ class JobStatus(BaseModel):
     updated_at: datetime
     completed_at: datetime | None = None
     error_message: str | None = None
+    # Whether OPF was active when the pipeline ran. ``None`` for legacy
+    # jobs from before this column existed.
+    opf_used: bool | None = None
 
     @field_serializer("created_at", "updated_at", "completed_at")
     def _ser_dt(self, dt: datetime | None) -> str | None:

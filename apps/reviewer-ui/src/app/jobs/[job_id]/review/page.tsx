@@ -10,6 +10,7 @@ import {
   getReport,
   postReviewEvent,
   rejectJob,
+  reprocessJob,
   revertSpan,
   unapproveJob,
 } from "@/lib/api";
@@ -20,6 +21,7 @@ import type {
   Report,
   ReviewEventInput,
 } from "@/lib/types";
+import { OpfModeBadge } from "@/components/OpfModeBadge";
 import { RiskBadge, StatusBadge } from "@/components/StatusBadge";
 
 const CONTEXT_CHARS = 30;
@@ -325,7 +327,6 @@ export default function ReviewPage({
   const [job, setJob] = useState<Job | null>(null);
   const [report, setReport] = useState<Report | null>(null);
   const [error, setError] = useState<string | null>(null);
-  const [docComment, setDocComment] = useState<string>("");
   const [manualSelection, setManualSelection] = useState<SelectionInfo | null>(
     null
   );
@@ -464,16 +465,6 @@ export default function ReviewPage({
     flash(`Comentário salvo no trecho #${i}`);
   }
 
-  async function onMissedPii() {
-    if (!docComment) return;
-    await recordEvent({
-      event_type: "missed_pii",
-      note: docComment,
-    });
-    setDocComment("");
-    flash("Reporte de PII não detectada enviado");
-  }
-
   function clearManualSelection() {
     setManualSelection(null);
     window.getSelection()?.removeAllRanges();
@@ -559,6 +550,42 @@ export default function ReviewPage({
     }
   }
 
+  async function onReprocess() {
+    if (!job) return;
+    const ok = window.confirm(
+      "Vai apagar a revisão atual deste documento e refazer a " +
+        "anonimização com as configurações ativas agora (presets, " +
+        "detectores habilitados e estado do botão OPF).\n\n" +
+        "Continuar?"
+    );
+    if (!ok) return;
+    setBusy(true);
+    flash("Reprocessando…");
+    try {
+      const started = await reprocessJob(params.job_id);
+      setJob(started);
+      // Poll until the worker leaves pending/processing, then reload the
+      // full report so the UI reflects the new spans/decision.
+      const deadline = Date.now() + 60_000;
+      while (Date.now() < deadline) {
+        await new Promise((r) => setTimeout(r, 600));
+        const next = await getJob(params.job_id);
+        if (next.status !== "pending" && next.status !== "processing") {
+          setJob(next);
+          break;
+        }
+        setJob(next);
+      }
+      const fresh = await getReport(params.job_id);
+      setReport(fresh);
+      flash("Documento reprocessado");
+    } catch (e) {
+      flash(`Falha ao reprocessar: ${e instanceof Error ? e.message : String(e)}`);
+    } finally {
+      setBusy(false);
+    }
+  }
+
   if (error) return <p className="muted">Falha: {error}</p>;
   if (!job || !report) return <p className="muted">Carregando…</p>;
 
@@ -579,14 +606,39 @@ export default function ReviewPage({
       </p>
 
       <div className="card">
-        <h1 style={{ marginBottom: 4 }}>Revisar documento</h1>
-        <p className="muted">
-          {job.source_filename} · <StatusBadge status={job.status} /> ·{" "}
-          <RiskBadge level={job.risk_level} />{" "}
-          {job.risk_score !== null && (
-            <span>(pontuação {job.risk_score.toFixed(1)})</span>
-          )}
-        </p>
+        <div
+          className="row"
+          style={{
+            justifyContent: "space-between",
+            alignItems: "flex-start",
+            gap: 12,
+            flexWrap: "wrap",
+          }}
+        >
+          <div>
+            <h1 style={{ marginBottom: 4 }}>Revisar documento</h1>
+            <p className="muted" style={{ margin: 0 }}>
+              {job.source_filename} · <StatusBadge status={job.status} /> ·{" "}
+              <RiskBadge level={job.risk_level} />{" "}
+              {job.risk_score !== null && (
+                <span>(pontuação {job.risk_score.toFixed(1)}) </span>
+              )}
+              <OpfModeBadge opfUsed={job.opf_used} />
+            </p>
+          </div>
+          <button
+            type="button"
+            className="btn"
+            onClick={onReprocess}
+            disabled={busy}
+            title={
+              "Refaz a anonimização com as configurações ativas " +
+              "(presets, detectores, botão OPF). Apaga a revisão atual."
+            }
+          >
+            🔁 Reprocessar
+          </button>
+        </div>
         {isCritical && report.risk_assessment.reasons.length > 0 && (
           <details open style={{ marginTop: 12 }}>
             <summary style={{ cursor: "pointer", fontWeight: 600 }}>
@@ -702,26 +754,6 @@ export default function ReviewPage({
               activeIndex,
               spanStates
             )}
-          </div>
-          <div style={{ marginTop: 16 }}>
-            <h2>Reportar PII não detectada</h2>
-            <p className="muted">
-              O sistema deixou passar algum dado sensível? Descreva onde
-              está (sem colar o conteúdo original).
-            </p>
-            <textarea
-              placeholder="ex.: bloco-0002 contém um número de passaporte sem máscara perto da linha 5"
-              value={docComment}
-              onChange={(e) => setDocComment(e.target.value)}
-            />
-            <button
-              className="btn btn-small"
-              onClick={onMissedPii}
-              disabled={!docComment}
-              style={{ marginTop: 6 }}
-            >
-              Enviar reporte
-            </button>
           </div>
         </div>
 

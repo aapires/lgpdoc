@@ -4,6 +4,7 @@ from __future__ import annotations
 from datetime import datetime, timezone
 
 from sqlalchemy import (
+    Boolean,
     DateTime,
     Float,
     ForeignKey,
@@ -62,6 +63,11 @@ class JobModel(Base):
     risk_level: Mapped[str | None] = mapped_column(String(20), nullable=True)
     risk_score: Mapped[float | None] = mapped_column(Float, nullable=True)
     error_message: Mapped[str | None] = mapped_column(String, nullable=True)
+
+    # Was the OPF model active when this job was processed? Captured at
+    # the start of the pipeline run via OPFManager.acquire(). ``None``
+    # for legacy rows from before this column existed.
+    opf_used: Mapped[bool | None] = mapped_column(Boolean, nullable=True)
 
     policy_version_id: Mapped[int | None] = mapped_column(
         Integer, ForeignKey("policy_versions.id"), nullable=True

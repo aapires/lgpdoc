@@ -34,6 +34,10 @@ export interface Job {
   updated_at: string;
   completed_at: string | null;
   error_message: string | null;
+  // ``true`` if OPF was active when the job was processed; ``false`` if
+  // it ran on regex only; ``null`` for legacy jobs from before the
+  // toggle was tracked.
+  opf_used: boolean | null;
 }
 
 // ---------------------------------------------------------------------------

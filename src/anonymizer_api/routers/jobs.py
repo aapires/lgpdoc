@@ -478,3 +478,39 @@ def delete_job(
             else status.HTTP_409_CONFLICT
         )
         raise HTTPException(status_code=code, detail=msg)
+
+
+@router.post(
+    "/{job_id}/reprocess",
+    response_model=JobStatus,
+    status_code=status.HTTP_202_ACCEPTED,
+)
+def reprocess_job(
+    job_id: str,
+    request: Request,
+    background_tasks: BackgroundTasks,
+    service: JobService = Depends(get_service),
+) -> JobStatus:
+    """Re-run the pipeline for *job_id* with current settings + OPF state.
+
+    Wipes prior detection artefacts (spans, redacted text, report) and
+    review events for the job, resets it to ``pending``, then schedules
+    the same background task the upload endpoint uses. The source file
+    in quarantine and the original upload metadata are preserved.
+
+    Returns 409 if the job is currently being processed.
+    """
+    try:
+        job = service.reset_for_reprocess(job_id)
+    except InvalidStateError as exc:
+        msg = str(exc)
+        code = (
+            status.HTTP_404_NOT_FOUND
+            if "not found" in msg or "missing on disk" in msg
+            else status.HTTP_409_CONFLICT
+        )
+        raise HTTPException(status_code=code, detail=msg)
+
+    background_tasks.add_task(_run_processing, request.app, job_id)
+    logger.info("Reprocess scheduled job_id=%s", job_id)
+    return JobStatus.model_validate(job)

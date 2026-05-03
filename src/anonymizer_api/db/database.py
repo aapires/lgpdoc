@@ -35,6 +35,7 @@ class Database:
             # null (standalone jobs) and the listing endpoint filters
             # by IS NULL by default.
             self._ensure_column("jobs", "container_id", "VARCHAR(36)")
+            self._ensure_column("jobs", "opf_used", "BOOLEAN")
             self._ensure_column(
                 "container_documents", "job_id", "VARCHAR(36)"
             )

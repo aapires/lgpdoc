@@ -33,6 +33,7 @@ export const MOCK_JOBS: Job[] = [
     completed_at: NOW,
     error_message: null,
     mode: "anonymization",
+    opf_used: true,
   },
   {
     job_id: "22222222-2222-2222-2222-222222222222",
@@ -49,6 +50,7 @@ export const MOCK_JOBS: Job[] = [
     completed_at: HOUR_AGO,
     error_message: null,
     mode: "anonymization",
+    opf_used: false,
   },
   {
     job_id: "33333333-3333-3333-3333-333333333333",
@@ -65,6 +67,7 @@ export const MOCK_JOBS: Job[] = [
     completed_at: TWO_HOURS_AGO,
     error_message: null,
     mode: "anonymization",
+    opf_used: true,
   },
   {
     job_id: "44444444-4444-4444-4444-444444444444",
@@ -81,6 +84,7 @@ export const MOCK_JOBS: Job[] = [
     completed_at: HOUR_AGO,
     error_message: null,
     mode: "anonymization",
+    opf_used: null,
   },
 ];
 

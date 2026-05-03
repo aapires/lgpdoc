@@ -12,6 +12,7 @@ import {
   RiskBadge,
   StatusBadge,
 } from "@/components/StatusBadge";
+import { OpfModeBadge } from "@/components/OpfModeBadge";
 import { JobContentPanel } from "@/components/JobContentPanel";
 import { DetectorComparisonPanel } from "@/components/DetectorComparisonPanel";
 import { ReversiblePanel } from "@/components/ReversiblePanel";
@@ -128,6 +129,7 @@ export default function JobDetailPage({
           <StatusBadge status={job.status} size="lg" />
           {job.risk_level && <RiskBadge level={job.risk_level} size="lg" />}
           <ModeBadge mode={job.mode} size="lg" />
+          <OpfModeBadge opfUsed={job.opf_used} />
         </div>
 
         <div className="job-hero-actions">

@@ -241,6 +241,13 @@ class JobService:
         leased_base = (
             self.opf_manager.acquire() if self.opf_manager is not None else None
         )
+        # Persist whether OPF was active at the moment the lease was
+        # taken, so the UI can badge the result and the user knows
+        # which detector ran. We check via the subprocess type rather
+        # than the manager's live state to avoid a race with disable().
+        from anonymizer.subprocess_opf_client import SubprocessOPFClient
+        opf_used = isinstance(leased_base, SubprocessOPFClient)
+        self.jobs.update(job_id, opf_used=opf_used)
         if leased_base is not None and self.settings_store is not None:
             run_client: PrivacyFilterClient = make_augmented_client(
                 leased_base,
@@ -1081,6 +1088,84 @@ class JobService:
                 )
 
         logger.info("Job permanently deleted job_id=%s", job_id)
+
+    # ------------------------------------------------------------------
+    # Re-processing (in place — keeps the same job_id and source file)
+    # ------------------------------------------------------------------
+
+    def reset_for_reprocess(self, job_id: str) -> JobModel:
+        """Wipe artefacts and DB rows produced by a previous pipeline run.
+
+        Resets the job back to ``pending`` so the background worker can
+        re-run the pipeline with the *current* settings + OPF state. The
+        source document in quarantine is preserved (it's the input).
+
+        Refuses jobs that are still ``pending`` / ``processing`` to
+        avoid racing the worker.
+        """
+        job = self.jobs.get(job_id)
+        if job is None:
+            raise InvalidStateError(f"Job {job_id!r} not found")
+        if job.status in (STATUS_PENDING, STATUS_PROCESSING):
+            raise InvalidStateError(
+                f"Cannot reprocess job in status {job.status!r}; "
+                "wait for the current run to finish"
+            )
+        if not job.quarantine_path or not Path(job.quarantine_path).exists():
+            raise InvalidStateError(
+                "Source document missing on disk — reprocessing requires "
+                "the original upload to still be in quarantine."
+            )
+
+        # 1. Drop dependent rows (no ON DELETE CASCADE on SQLite by default).
+        self.spans.delete_for_job(job_id)
+        self.reviews.delete_for_job(job_id)
+
+        # 2. Wipe everything in the output dir EXCEPT the detector
+        #    comparison artefact (it's a separate diagnostic the user
+        #    may want preserved across reruns; the comparison endpoint
+        #    overwrites it on next call anyway).
+        output_dir = self.storage.output_for(job_id)
+        if output_dir.exists():
+            comparison = output_dir / self.DETECTOR_COMPARISON_FILENAME
+            comparison_payload = (
+                comparison.read_bytes() if comparison.exists() else None
+            )
+            for entry in output_dir.iterdir():
+                try:
+                    if entry.is_dir():
+                        shutil.rmtree(entry)
+                    else:
+                        entry.unlink()
+                except OSError as exc:
+                    logger.warning(
+                        "reprocess: could not remove %s: %s", entry, exc
+                    )
+            if comparison_payload is not None:
+                comparison.write_bytes(comparison_payload)
+
+        # 3. Reset the job row itself. Preserve the upload metadata
+        #    (filename / hash / size / format / quarantine_path / mode /
+        #    container_id) so reprocess feels like "re-run", not
+        #    "re-upload".
+        self.jobs.update(
+            job_id,
+            status=STATUS_PENDING,
+            decision=None,
+            risk_level=None,
+            risk_score=None,
+            error_message=None,
+            completed_at=None,
+            redacted_path=None,
+            spans_path=None,
+            metadata_path=None,
+            report_path=None,
+            restored_path=None,
+            opf_used=None,
+        )
+
+        logger.info("Job reset for reprocess job_id=%s", job_id)
+        return self.jobs.get(job_id)  # type: ignore[return-value]
 
     # ------------------------------------------------------------------
     # Detector comparison (diagnostic mode — does not change job.status)
