@@ -64,13 +64,13 @@ export function OpfToggle() {
     }
   };
 
-  let label = "OPF desligado";
+  let label = "OpenAI Privacy Filter OFF";
   let cls = "opf-toggle opf-off";
   if (status.loading || pending) {
-    label = "Subindo OPF…";
+    label = "OpenAI Privacy Filter loading…";
     cls = "opf-toggle opf-loading";
   } else if (status.enabled) {
-    label = "OPF ligado";
+    label = "OpenAI Privacy Filter ON";
     cls = "opf-toggle opf-on";
   }
 

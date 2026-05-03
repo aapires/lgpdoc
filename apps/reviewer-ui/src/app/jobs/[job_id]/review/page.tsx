@@ -601,8 +601,9 @@ export default function ReviewPage({
 
   return (
     <div>
-      <p>
-        <Link href={`/jobs/${job.job_id}`}>← voltar para o documento</Link>
+      <p style={{ display: "flex", gap: 16 }}>
+        <Link href="/jobs">← voltar para a lista</Link>
+        <Link href={`/jobs/${job.job_id}`}>detalhes do documento →</Link>
       </p>
 
       <div className="card">
