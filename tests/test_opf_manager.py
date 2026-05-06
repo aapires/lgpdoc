@@ -184,6 +184,83 @@ class TestOPFManager:
 
 
 # ---------------------------------------------------------------------------
+# Idle watchdog — auto-disable after N seconds of no activity
+# ---------------------------------------------------------------------------
+
+class TestIdleWatchdog:
+    def test_zero_timeout_disables_watchdog(self) -> None:
+        m = OPFManager(available=True, use_mock_worker=True, idle_timeout_seconds=0)
+        m.enable()
+        # No watchdog thread spawned, _check_idle_once short-circuits.
+        assert m._check_idle_once() is False
+        assert m.status().enabled is True
+        m.shutdown()
+
+    def test_check_idle_once_skips_when_not_yet_idle(self) -> None:
+        m = OPFManager(available=True, use_mock_worker=True, idle_timeout_seconds=60)
+        m.enable()
+        assert m._check_idle_once() is False
+        assert m.status().enabled is True
+        m.shutdown()
+
+    def test_check_idle_once_disables_after_timeout(self) -> None:
+        """With a tiny timeout, the next watchdog tick after activity
+        elapses must disable OPF."""
+        import time as _t
+        m = OPFManager(available=True, use_mock_worker=True, idle_timeout_seconds=1)
+        m.enable()
+        _t.sleep(1.1)
+        assert m._check_idle_once() is True
+        assert m.status().enabled is False
+
+    def test_in_flight_lease_blocks_auto_disable(self) -> None:
+        """Even past the idle timeout, an outstanding lease must keep the
+        subprocess alive — pulling the rug from a job mid-detect would
+        be a worse failure than the memory cost of waiting."""
+        import time as _t
+        m = OPFManager(available=True, use_mock_worker=True, idle_timeout_seconds=1)
+        m.enable()
+        leased = m.acquire()
+        _t.sleep(1.1)
+        # Refcount > 0 → watchdog must NOT disable.
+        assert m._check_idle_once() is False
+        assert m.status().enabled is True
+        m.release(leased)
+        m.shutdown()
+
+    def test_status_reports_seconds_until_auto_disable(self) -> None:
+        m = OPFManager(available=True, use_mock_worker=True, idle_timeout_seconds=120)
+        m.enable()
+        s = m.status()
+        assert s.idle_timeout_seconds == 120
+        # ``seconds_until_auto_disable`` should be close to the timeout
+        # right after enable (small drift acceptable for slow CI).
+        assert s.seconds_until_auto_disable is not None
+        assert 110 <= s.seconds_until_auto_disable <= 120
+        m.shutdown()
+
+    def test_status_clears_countdown_when_off(self) -> None:
+        m = OPFManager(available=True, use_mock_worker=True, idle_timeout_seconds=60)
+        # Never enabled — no countdown to report.
+        assert m.status().seconds_until_auto_disable is None
+        m.shutdown()
+
+    def test_acquire_resets_idle_clock(self) -> None:
+        """An acquire after the timeout has elapsed must NOT trip the
+        next watchdog tick — the activity reset the clock."""
+        import time as _t
+        m = OPFManager(available=True, use_mock_worker=True, idle_timeout_seconds=1)
+        m.enable()
+        _t.sleep(1.1)
+        leased = m.acquire()
+        m.release(leased)  # release also touches; window resets again
+        # Immediately after release, plenty of budget remains.
+        assert m._check_idle_once() is False
+        assert m.status().enabled is True
+        m.shutdown()
+
+
+# ---------------------------------------------------------------------------
 # API endpoints
 # ---------------------------------------------------------------------------
 

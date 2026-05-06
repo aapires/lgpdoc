@@ -859,6 +859,8 @@ const MOCK_OPF_STATUS: OpfStatus = {
   loading: false,
   error: null,
   in_flight_jobs: 0,
+  idle_timeout_seconds: 0,
+  seconds_until_auto_disable: null,
 };
 
 export async function getOpfStatus(): Promise<OpfStatus> {

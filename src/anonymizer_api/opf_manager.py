@@ -23,6 +23,7 @@ from __future__ import annotations
 
 import logging
 import threading
+import time
 from dataclasses import dataclass
 
 from anonymizer.client import MockPrivacyFilterClient, PrivacyFilterClient
@@ -40,6 +41,12 @@ class OPFStatus:
     loading: bool
     error: str | None = None
     in_flight_jobs: int = 0
+    # Auto-disable settings: ``idle_timeout_seconds == 0`` means the
+    # watchdog is off and the subprocess stays up until the user
+    # explicitly disables it. ``seconds_until_auto_disable`` is ``None``
+    # when not enabled or when the timer is off.
+    idle_timeout_seconds: int = 0
+    seconds_until_auto_disable: int | None = None
 
 
 class ToggledBaseClient(PrivacyFilterClient):
@@ -55,7 +62,13 @@ class ToggledBaseClient(PrivacyFilterClient):
         self._manager = manager
 
     def detect(self, text: str) -> list[DetectedSpan]:
-        return self._manager.current_base().detect(text)
+        target = self._manager.current_base()
+        # Touch the idle clock whenever a real OPF call goes through —
+        # the watchdog only auto-disables after N seconds of *no*
+        # subprocess activity (and zero outstanding leases).
+        if isinstance(target, SubprocessOPFClient):
+            self._manager.touch()
+        return target.detect(text)
 
 
 class OPFManager:
@@ -71,6 +84,7 @@ class OPFManager:
         available: bool,
         fallback_client: PrivacyFilterClient | None = None,
         use_mock_worker: bool = False,
+        idle_timeout_seconds: int = 300,
     ) -> None:
         self._available = available
         # ``_fallback`` is the base used when OPF is OFF. Defaults to
@@ -97,18 +111,36 @@ class OPFManager:
         # Notified when refcount reaches zero so disable() can wait.
         self._zero_refs = threading.Condition(self._lock)
 
+        # Idle watchdog state. Disable by setting timeout <= 0.
+        self._idle_timeout = idle_timeout_seconds
+        self._last_used_at = time.monotonic()
+        self._stop_event = threading.Event()
+        self._watchdog: threading.Thread | None = None
+        if self._idle_timeout > 0:
+            self._start_watchdog()
+
     # ------------------------------------------------------------------
     # Read-only state
     # ------------------------------------------------------------------
 
     def status(self) -> OPFStatus:
         with self._lock:
+            seconds_left: int | None = None
+            if (
+                self._enabled
+                and self._idle_timeout > 0
+                and self._refcount == 0
+            ):
+                elapsed = time.monotonic() - self._last_used_at
+                seconds_left = max(0, int(self._idle_timeout - elapsed))
             return OPFStatus(
                 available=self._available,
                 enabled=self._enabled,
                 loading=self._loading,
                 error=self._error,
                 in_flight_jobs=self._refcount,
+                idle_timeout_seconds=self._idle_timeout,
+                seconds_until_auto_disable=seconds_left,
             )
 
     @property
@@ -172,6 +204,7 @@ class OPFManager:
             self._client = client
             self._enabled = True
             self._loading = False
+            self._last_used_at = time.monotonic()
             self._zero_refs.notify_all()
         logger.info("OPF enabled")
 
@@ -221,6 +254,7 @@ class OPFManager:
         with self._lock:
             if self._enabled and self._client is not None and self._client.is_running():
                 self._refcount += 1
+                self._last_used_at = time.monotonic()
                 return self._client
             return self._fallback
 
@@ -237,8 +271,18 @@ class OPFManager:
                 logger.error("release() called with refcount already 0")
                 return
             self._refcount -= 1
+            # Treat lease end as activity — the idle clock should
+            # measure time since the last interaction in either
+            # direction, not just the last acquire.
+            self._last_used_at = time.monotonic()
             if self._refcount == 0:
                 self._zero_refs.notify_all()
+
+    def touch(self) -> None:
+        """Reset the idle clock. Called on every detect() that hits the
+        OPF subprocess via the ToggledBaseClient."""
+        with self._lock:
+            self._last_used_at = time.monotonic()
 
     # ------------------------------------------------------------------
     # Helper for the comparison endpoint — auto-load if not yet loaded.
@@ -256,3 +300,66 @@ class OPFManager:
             if self._enabled:
                 return
         self.enable()
+
+    # ------------------------------------------------------------------
+    # Idle watchdog — auto-disable after N seconds of no activity, so
+    # users who flip the toggle ON and forget about it don't keep ~3 GB
+    # of model weights resident indefinitely.
+    # ------------------------------------------------------------------
+
+    def _start_watchdog(self) -> None:
+        # Poll roughly six times per timeout window, but never faster
+        # than once every 5 s and never slower than once every 30 s.
+        # Keeps the check responsive without spinning the CPU.
+        poll = max(5.0, min(30.0, self._idle_timeout / 6))
+
+        def loop() -> None:
+            while not self._stop_event.wait(poll):
+                try:
+                    self._check_idle_once()
+                except Exception:
+                    logger.exception("OPF idle watchdog tick failed")
+
+        t = threading.Thread(
+            target=loop, daemon=True, name="opf-idle-watchdog"
+        )
+        t.start()
+        self._watchdog = t
+
+    def _check_idle_once(self) -> bool:
+        """One pass of the watchdog. Returns True if it disabled OPF.
+
+        Exposed (vs. inline in the loop) so tests can drive the timer
+        deterministically without sleeping for the polling interval.
+        """
+        with self._lock:
+            if self._idle_timeout <= 0:
+                # Watchdog disabled — never auto-shut OPF down.
+                return False
+            if not self._enabled:
+                return False
+            if self._refcount > 0:
+                # In-flight jobs are still using OPF — don't kill it.
+                return False
+            elapsed = time.monotonic() - self._last_used_at
+            if elapsed < self._idle_timeout:
+                return False
+            logger.info(
+                "OPF auto-disable: idle for %.0fs (timeout=%ds)",
+                elapsed,
+                self._idle_timeout,
+            )
+        # Drop the lock before disable() — it takes the same lock.
+        self.disable(wait_for_jobs=False)
+        return True
+
+    def shutdown(self) -> None:
+        """Stop the watchdog thread and tear down the subprocess.
+
+        Called from the FastAPI lifespan shutdown handler. Idempotent.
+        """
+        self._stop_event.set()
+        watchdog = self._watchdog
+        if watchdog is not None and watchdog.is_alive():
+            watchdog.join(timeout=2.0)
+        self.disable(wait_for_jobs=False)

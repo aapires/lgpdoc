@@ -26,6 +26,12 @@ class Settings(BaseSettings):
     # real OPF model. Tests-only — exercises the subprocess plumbing without
     # requiring torch/opf to be installed.
     opf_use_mock_worker: bool = False
+    # Auto-disable OPF after this many seconds of no detect/acquire
+    # activity (and zero outstanding leases). Default 300 s (5 min) so a
+    # user who turns OPF on, runs a doc, and forgets to flip it back
+    # doesn't keep ~3 GB of model weights resident overnight. Set to 0
+    # to disable the watchdog entirely.
+    opf_idle_timeout_seconds: int = 300
     # Origins allowed by CORS — defaults cover the Next.js dev server.
     cors_origins: list[str] = [
         "http://localhost:3000",

@@ -260,3 +260,10 @@ class OPFStatusSchema(BaseModel):
     # Number of jobs currently leasing the OPF subprocess. ``disable``
     # waits for this to hit zero (or times out).
     in_flight_jobs: int = 0
+    # Idle-watchdog configuration: how many seconds of inactivity before
+    # OPF is auto-disabled. ``0`` means the watchdog is off.
+    idle_timeout_seconds: int = 0
+    # Seconds remaining until the next watchdog tick auto-disables the
+    # subprocess (or ``None`` when not enabled / no watchdog / job in
+    # flight). The UI uses this to show "auto-desliga em X:YY".
+    seconds_until_auto_disable: int | None = None

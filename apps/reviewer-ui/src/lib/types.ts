@@ -368,5 +368,10 @@ export interface OpfStatus {
   loading: boolean;
   error: string | null;
   in_flight_jobs: number;
+  // Idle watchdog: seconds of inactivity before auto-disable. 0 = off.
+  idle_timeout_seconds: number;
+  // Seconds until the next idle-watchdog tick disables OPF, or null
+  // if the timer doesn't apply (not enabled, watchdog off, in-flight job).
+  seconds_until_auto_disable: number | null;
 }
 

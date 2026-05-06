@@ -73,6 +73,7 @@ def create_app(settings: Settings | None = None) -> FastAPI:
     opf_manager = OPFManager(
         available=not settings.use_mock_client,
         use_mock_worker=settings.opf_use_mock_worker,
+        idle_timeout_seconds=settings.opf_idle_timeout_seconds,
     )
     client, regex_client = _make_clients(settings, settings_store, opf_manager)
 
@@ -139,8 +140,9 @@ def create_app(settings: Settings | None = None) -> FastAPI:
         try:
             yield
         finally:
-            # Don't wait for in-flight jobs — uvicorn is already tearing down.
-            opf_manager.disable(wait_for_jobs=False)
+            # Don't wait for in-flight jobs — uvicorn is already tearing
+            # down. shutdown() also stops the idle watchdog thread.
+            opf_manager.shutdown()
 
     app = FastAPI(
         title="LGPDoc API",

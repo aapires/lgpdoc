@@ -28,9 +28,7 @@ def _get_manager(request: Request) -> OPFManager:
     return request.app.state.opf_manager
 
 
-@router.get("/status", response_model=OPFStatusSchema)
-def get_status(request: Request) -> dict:
-    manager = _get_manager(request)
+def _to_response(manager: OPFManager) -> dict:
     s = manager.status()
     return {
         "available": s.available,
@@ -38,7 +36,15 @@ def get_status(request: Request) -> dict:
         "loading": s.loading,
         "error": s.error,
         "in_flight_jobs": s.in_flight_jobs,
+        "idle_timeout_seconds": s.idle_timeout_seconds,
+        "seconds_until_auto_disable": s.seconds_until_auto_disable,
     }
+
+
+@router.get("/status", response_model=OPFStatusSchema)
+def get_status(request: Request) -> dict:
+    manager = _get_manager(request)
+    return _to_response(manager)
 
 
 @router.post("/enable", response_model=OPFStatusSchema)
@@ -59,25 +65,11 @@ def enable(request: Request) -> dict:
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
             detail=f"Falha ao subir o OPF: {exc}",
         )
-    s = manager.status()
-    return {
-        "available": s.available,
-        "enabled": s.enabled,
-        "loading": s.loading,
-        "error": s.error,
-        "in_flight_jobs": s.in_flight_jobs,
-    }
+    return _to_response(manager)
 
 
 @router.post("/disable", response_model=OPFStatusSchema)
 def disable(request: Request) -> dict:
     manager = _get_manager(request)
     manager.disable()
-    s = manager.status()
-    return {
-        "available": s.available,
-        "enabled": s.enabled,
-        "loading": s.loading,
-        "error": s.error,
-        "in_flight_jobs": s.in_flight_jobs,
-    }
+    return _to_response(manager)
