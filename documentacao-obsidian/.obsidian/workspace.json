@@ -1,0 +1,200 @@
+{
+  "main": {
+    "id": "333bed05704274d3",
+    "type": "split",
+    "children": [
+      {
+        "id": "cedd59405836d167",
+        "type": "tabs",
+        "children": [
+          {
+            "id": "015771f89d4babb9",
+            "type": "leaf",
+            "state": {
+              "type": "markdown",
+              "state": {
+                "file": "06 - OPF runtime toggle.md",
+                "mode": "source",
+                "source": false
+              },
+              "icon": "lucide-file",
+              "title": "06 - OPF runtime toggle"
+            }
+          }
+        ]
+      }
+    ],
+    "direction": "vertical"
+  },
+  "left": {
+    "id": "a512201d3a5fb2a8",
+    "type": "split",
+    "children": [
+      {
+        "id": "ea5bce22ce773ac0",
+        "type": "tabs",
+        "children": [
+          {
+            "id": "fcf32171684bbc20",
+            "type": "leaf",
+            "state": {
+              "type": "file-explorer",
+              "state": {
+                "sortOrder": "alphabetical",
+                "autoReveal": false
+              },
+              "icon": "lucide-folder-closed",
+              "title": "Explorador de arquivos"
+            }
+          },
+          {
+            "id": "3763155c27f821cb",
+            "type": "leaf",
+            "state": {
+              "type": "search",
+              "state": {
+                "query": "",
+                "matchingCase": false,
+                "explainSearch": false,
+                "collapseAll": false,
+                "extraContext": false,
+                "sortOrder": "alphabetical"
+              },
+              "icon": "lucide-search",
+              "title": "Procurar"
+            }
+          },
+          {
+            "id": "6cf5c42ffe0aa2aa",
+            "type": "leaf",
+            "state": {
+              "type": "bookmarks",
+              "state": {},
+              "icon": "lucide-bookmark",
+              "title": "Marcadores"
+            }
+          }
+        ]
+      }
+    ],
+    "direction": "horizontal",
+    "width": 300
+  },
+  "right": {
+    "id": "ebcb73b657930784",
+    "type": "split",
+    "children": [
+      {
+        "id": "70f9115e93477d85",
+        "type": "tabs",
+        "children": [
+          {
+            "id": "dbcf24fbd82e5852",
+            "type": "leaf",
+            "state": {
+              "type": "backlink",
+              "state": {
+                "file": "06 - OPF runtime toggle.md",
+                "collapseAll": false,
+                "extraContext": false,
+                "sortOrder": "alphabetical",
+                "showSearch": false,
+                "searchQuery": "",
+                "backlinkCollapsed": false,
+                "unlinkedCollapsed": true
+              },
+              "icon": "links-coming-in",
+              "title": "Links inversos para 06 - OPF runtime toggle"
+            }
+          },
+          {
+            "id": "da6ac5a24052313b",
+            "type": "leaf",
+            "state": {
+              "type": "outgoing-link",
+              "state": {
+                "file": "06 - OPF runtime toggle.md",
+                "linksCollapsed": false,
+                "unlinkedCollapsed": true
+              },
+              "icon": "links-going-out",
+              "title": "Links de saída para 06 - OPF runtime toggle"
+            }
+          },
+          {
+            "id": "e5f373d1a47ddc93",
+            "type": "leaf",
+            "state": {
+              "type": "tag",
+              "state": {
+                "sortOrder": "frequency",
+                "useHierarchy": true,
+                "showSearch": false,
+                "searchQuery": ""
+              },
+              "icon": "lucide-tags",
+              "title": "Etiquetas"
+            }
+          },
+          {
+            "id": "1868e82883890533",
+            "type": "leaf",
+            "state": {
+              "type": "all-properties",
+              "state": {
+                "sortOrder": "frequency",
+                "showSearch": false,
+                "searchQuery": ""
+              },
+              "icon": "lucide-archive",
+              "title": "Todas as propriedades"
+            }
+          },
+          {
+            "id": "fbd5fcadeb6f6053",
+            "type": "leaf",
+            "state": {
+              "type": "outline",
+              "state": {
+                "file": "06 - OPF runtime toggle.md",
+                "followCursor": false,
+                "showSearch": false,
+                "searchQuery": ""
+              },
+              "icon": "lucide-list",
+              "title": "Sumário de 06 - OPF runtime toggle"
+            }
+          }
+        ]
+      }
+    ],
+    "direction": "horizontal",
+    "width": 300,
+    "collapsed": true
+  },
+  "left-ribbon": {
+    "hiddenItems": {
+      "switcher:Abrir a troca rápida": false,
+      "graph:Abrir visualização em gráfico": false,
+      "canvas:Criar novo canvas": false,
+      "daily-notes:Abrir a nota de hoje": false,
+      "templates:Inserir modelo": false,
+      "command-palette:Abrir paleta de comandos": false,
+      "bases:Criar nova base": false
+    }
+  },
+  "active": "015771f89d4babb9",
+  "lastOpenFiles": [
+    "14 - Frontend.md",
+    "10 - Configurações.md",
+    "08 - Containers.md",
+    "07 - Modos de processamento.md",
+    "01 - Visão geral.md",
+    "00 - Início.md",
+    "12 - Banco de dados.md",
+    "02 - Instalação.md",
+    "06 - OPF runtime toggle.md",
+    "Glossário.md",
+    "03 - Arquitetura.md"
+  ]
+}
