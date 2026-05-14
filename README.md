@@ -64,114 +64,94 @@ Abra `http://localhost:3000/jobs`.
 
 ### Windows 10 / 11
 
-Não há instalador automático no Windows — você instala três coisas, clona o repo e sobe em dois terminais. Plano: ~15–20 min na primeira vez. Recomendo começar pelo **modo `--mock`** (só regex, sem download de modelo) para validar que tudo funciona antes de baixar os ~3 GB do OPF.
+#### Caminho recomendado: `install.ps1`
 
-#### 1. Pré-requisitos (instaladores oficiais)
+Há um script PowerShell em `scripts/install.ps1` que automatiza praticamente tudo: instala Python 3.11, Node 20 e Git via **winget** (gerenciador de pacotes nativo do Windows 10/11), clona o repo, monta o venv e instala dependências de backend e frontend.
 
-Baixe e instale, nessa ordem:
+**Pré-requisito**: `winget` precisa estar disponível. Já vem nativo no Windows 11 e na maioria das instalações recentes do Windows 10. Se faltar, instale "App Installer" pela [Microsoft Store](https://apps.microsoft.com/detail/9NBLGGH4NNS1).
 
-1. **Python 3.11 ou 3.12** → [python.org/downloads](https://www.python.org/downloads/windows/)
-   - **Marque "Add python.exe to PATH"** na primeira tela do instalador. É a checkbox mais importante.
-2. **Node.js 20 LTS** → [nodejs.org](https://nodejs.org/) — escolha o instalador "LTS".
-3. **Git for Windows** → [git-scm.com/download/win](https://git-scm.com/download/win) — traz junto o **Git Bash**, que vamos usar para clonar e (opcionalmente) rodar o script de start.
-
-Para confirmar que tudo entrou no PATH, abra um **novo** PowerShell e rode:
+Abra o **PowerShell** (não precisa de admin) na pasta onde quer guardar o projeto e rode:
 
 ```powershell
-python --version    # deve mostrar 3.11.x ou 3.12.x
-node --version      # deve mostrar v20.x
-git --version
+Set-ExecutionPolicy -Scope Process Bypass -Force
+Invoke-WebRequest https://raw.githubusercontent.com/aapires/lgpdoc/main/scripts/install.ps1 -OutFile install.ps1
+.\install.ps1
 ```
 
-Se algum comando não for reconhecido, feche e abra o PowerShell de novo. Se ainda assim falhar, o instalador não adicionou ao PATH — reinstale marcando a opção.
+A primeira linha libera execução de scripts apenas para essa sessão de PowerShell (não afeta o resto do sistema). A terceira roda o instalador — leva ~15 min na primeira vez, baixa ~500 MB.
 
-#### 2. Clone e setup
+**Flags úteis**:
 
-No PowerShell, da pasta onde você quer guardar o projeto (ex.: `C:\Users\<seunome>\Projects`):
+```powershell
+.\install.ps1 -WithOcr               # instala tambem Tesseract OCR (para PDFs escaneados)
+.\install.ps1 -WithOpf               # instala torch + transformers + modelo OPF (~2 GB extras)
+.\install.ps1 -WithOpf -WithOcr      # tudo
+.\install.ps1 -RepoPath D:\projetos  # destino customizado (default: %USERPROFILE%\lgpdoc)
+.\install.ps1 -SkipClone             # rode de dentro de uma pasta ja clonada
+```
+
+Ao final, o script imprime os dois comandos para subir API+UI em dois terminais. Os comandos básicos (sem OPF, modo regex):
+
+```powershell
+# Terminal 1 - backend
+$env:ANONYMIZER_API_USE_MOCK_CLIENT = "true"
+.\.venv\Scripts\python -m uvicorn scripts.run_api:app --host 127.0.0.1 --port 9000
+
+# Terminal 2 - frontend
+cd apps\reviewer-ui
+npm run dev
+```
+
+Depois abra `http://localhost:3000/jobs`. Para encerrar, `Ctrl+C` nos dois terminais.
+
+> ⚠️ **Microsoft Store stub do Python**: se o `install.ps1` falhar com mensagem sobre stub do Python, vá em **Configurações → Aplicativos → Configurações avançadas de aplicativo → Aliases de execução de aplicativo** e desative `python.exe` e `python3.exe`. Reabra o PowerShell e rode `.\install.ps1 -SkipClone`.
+
+#### Setup manual (sem o script)
+
+Se preferir instalar à mão ou se `winget` não estiver disponível:
+
+1. Baixe e instale **Python 3.11/3.12** ([python.org](https://www.python.org/downloads/windows/) — **marque "Add python.exe to PATH"**), **Node.js 20 LTS** ([nodejs.org](https://nodejs.org/)) e **Git for Windows** ([git-scm.com](https://git-scm.com/download/win)).
+2. Em PowerShell, da pasta onde quer guardar o projeto:
 
 ```powershell
 git clone https://github.com/aapires/lgpdoc.git
 cd lgpdoc
 
-# Cria o venv
 python -m venv .venv
-
-# Atualiza o pip dentro do venv
 .\.venv\Scripts\python -m pip install --upgrade pip
+.\.venv\Scripts\pip install -e ".[dev,api,ocr]"      # regex apenas
+# ou:
+.\.venv\Scripts\pip install -e ".[dev,api,ocr,ml]"   # com OPF (~2 GB)
 
-# Instala o backend em modo regex (leve — recomendado para o primeiro teste)
-.\.venv\Scripts\pip install -e ".[dev,api,ocr]"
-
-# Instala o frontend
 cd apps\reviewer-ui
 npm install
 cd ..\..
 ```
 
-> 💡 No Windows, o venv vive em `.venv\Scripts\` (e não em `.venv/bin/` como no macOS/Linux). Os comandos abaixo usam o caminho do Windows.
+3. Suba API+UI com os mesmos dois comandos da seção anterior.
 
-#### 3. Subir a aplicação (sem OPF — modo `--mock`)
+#### OCR no Windows — passo manual restante
 
-Você precisa de **dois terminais PowerShell** abertos em paralelo, ambos na pasta `lgpdoc`.
+Mesmo com `install.ps1 -WithOcr`, o **Poppler** (binários para extrair imagens de PDF) não tem pacote winget oficial e precisa ser baixado à mão:
 
-**Terminal 1 — backend (API FastAPI):**
+1. Baixe o release mais recente em [github.com/oschwartz10612/poppler-windows/releases](https://github.com/oschwartz10612/poppler-windows/releases).
+2. Descompacte em `C:\poppler` (ou outro caminho).
+3. Adicione `C:\poppler\Library\bin` ao PATH do sistema.
 
-```powershell
-$env:ANONYMIZER_API_USE_MOCK_CLIENT = "true"
-.\.venv\Scripts\python -m uvicorn scripts.run_api:app --host 127.0.0.1 --port 9000
-```
+Se você não usou `-WithOcr`, instale o **Tesseract** pelo [instalador UB-Mannheim](https://github.com/UB-Mannheim/tesseract/wiki) e marque "Portuguese" durante a instalação.
 
-Espere a mensagem `Uvicorn running on http://127.0.0.1:9000`.
+Confirme com `tesseract --version` e `pdftoppm -v` num PowerShell novo.
 
-**Terminal 2 — frontend (Next.js):**
+#### Alternativa: `start-anom.sh` no Git Bash
 
-```powershell
-cd apps\reviewer-ui
-npm run dev
-```
-
-Espere `ready - started server on 0.0.0.0:3000`. Abra `http://localhost:3000/jobs` no navegador.
-
-Para encerrar, dê `Ctrl+C` nos dois terminais.
-
-#### 4. (Opcional) Ligar o OPF
-
-O OPF é semântico — pega nomes em narrativa sem precisar de gatilhos. Mas baixa ~3 GB na primeira execução e consome ~3 GB de RAM enquanto carregado. Só vale a pena se a máquina tiver pelo menos **8 GB de RAM livres**.
-
-```powershell
-.\.venv\Scripts\pip install -e ".[dev,api,ocr,ml]"
-```
-
-E suba a API **sem** o `ANONYMIZER_API_USE_MOCK_CLIENT=true` do passo anterior:
-
-```powershell
-.\.venv\Scripts\python -m uvicorn scripts.run_api:app --host 127.0.0.1 --port 9000
-```
-
-Na UI, o toggle "OPF" no header carrega/descarrega o modelo sob demanda.
-
-#### 5. (Opcional) OCR para PDFs escaneados e imagens
-
-Sem essas duas dependências, PDFs escaneados produzem texto vazio e uploads de imagem (`.png`, `.jpg`) são recusados com erro 400.
-
-- **Tesseract OCR** — instalador UB-Mannheim: [github.com/UB-Mannheim/tesseract/wiki](https://github.com/UB-Mannheim/tesseract/wiki).
-  - Durante a instalação, em "Additional language data", **marque "Portuguese"**.
-  - Adicione `C:\Program Files\Tesseract-OCR` ao PATH.
-- **Poppler** (binários do PDF) — baixe o release mais recente em [github.com/oschwartz10612/poppler-windows/releases](https://github.com/oschwartz10612/poppler-windows/releases).
-  - Descompacte em `C:\poppler` (ou outro lugar) e adicione `C:\poppler\Library\bin` ao PATH.
-
-Confirme rodando `tesseract --version` e `pdftoppm -v` num novo PowerShell.
-
-#### Alternativa: usar o `start-anom.sh` no Git Bash
-
-Se preferir um único comando, abra o **Git Bash** (instalado junto com o Git for Windows) na pasta `lgpdoc` e rode:
+Se preferir um comando único, abra o **Git Bash** (instalado junto com o Git for Windows) na pasta `lgpdoc` e rode:
 
 ```bash
 ./start-anom.sh --mock      # modo regex
 ./start-anom.sh             # com OPF (precisa do extra [ml] instalado)
 ```
 
-O script foi escrito para macOS/Linux, mas funciona no Git Bash. Se algum comando reclamar de fim de linha (`CRLF`), rode `git config --global core.autocrlf input` e clone o repositório de novo.
+Se algum comando reclamar de fim de linha (`CRLF`), rode `git config --global core.autocrlf input` e clone o repositório de novo.
 
 ### Linux (Ubuntu/Debian) — setup manual
 
@@ -248,7 +228,7 @@ src/anonymizer/         Core — detectores, redator, pipeline, política
 src/anonymizer_api/     FastAPI — routers, DB, jobs, containers, OPF manager
 apps/reviewer-ui/       Next.js — interface de revisão (PT-BR)
 policies/default.yaml   Política de redação (entity_type → estratégia)
-scripts/                CLIs + worker do subprocesso OPF
+scripts/                CLIs + worker do subprocesso OPF + install.ps1 (Windows)
 docs/                   project-context.md, pipeline.md, local_setup.md
 tests/                  pytest — 626 casos
 var/                    Estado runtime (NÃO versionado): quarantine/, output/, db
@@ -282,7 +262,7 @@ Os dois precisam estar verdes. Não há CI configurado — é responsabilidade l
 ## Limitações conhecidas
 
 - **macOS Catalina (10.15) ou anterior**: o `torch` parou de publicar wheels para essa versão. O OPF não roda; use `./start-anom.sh --mock` (regex apenas).
-- **Windows**: o `bootstrap.sh` não cobre Windows — o setup é manual (instaladores de Python, Node e Git for Windows, depois `pip install` e `npm install`). Veja a seção [Windows 10 / 11](#windows-10--11). O `start-anom.sh` funciona via Git Bash; alternativamente suba API e UI em dois terminais PowerShell.
+- **Windows**: o `bootstrap.sh` não cobre Windows — use o `scripts/install.ps1` (winget + venv + npm), descrito na seção [Windows 10 / 11](#windows-10--11). O `start-anom.sh` ainda funciona via Git Bash; alternativamente suba API e UI em dois terminais PowerShell.
 - **Sem suporte a `.doc` legado** (Word 97-2003 binário) — converta para `.docx` antes.
 - **DOCX não expõe número de página** — `page` fica `null` para esse formato.
 - **OCR opcional** — sem `[ocr]` instalado, PDFs escaneados produzem blocos vazios e uploads de imagem são recusados com 400.
