@@ -90,10 +90,31 @@ A primeira linha libera execução de scripts apenas para essa sessão de PowerS
 .\install.ps1 -SkipClone             # rode de dentro de uma pasta ja clonada
 ```
 
-Ao final, o script imprime os dois comandos para subir API+UI em dois terminais. Os comandos básicos (sem OPF, modo regex):
+#### Para subir a aplicação: `start-anom.ps1` (um único terminal)
+
+Há também `scripts/start-anom.ps1`, que sobe API e UI juntos no mesmo PowerShell e encerra os dois com `Ctrl+C`. É o atalho recomendado depois do `install.ps1`.
 
 ```powershell
-# Terminal 1 - backend
+.\scripts\start-anom.ps1                    # sobe API + UI (toggle OPF disponivel pela UI)
+.\scripts\start-anom.ps1 -Mock              # modo regex (sem OPF — nao baixa modelo)
+.\scripts\start-anom.ps1 -Mock -NoUi        # so backend (util para CLI/testes)
+.\scripts\start-anom.ps1 -Mock -OpenBrowser # abre o navegador automaticamente
+.\scripts\start-anom.ps1 -Reset             # zera var\ (DB + quarentena) antes de subir
+.\scripts\start-anom.ps1 -Port 9001 -UiPort 3001
+```
+
+Os processos rodam em background dentro do PowerShell e gravam log em `var\logs\api.log` e `var\logs\ui.log`. Para acompanhar em tempo real, abra outro PowerShell:
+
+```powershell
+Get-Content var\logs\api.log -Wait -Tail 20
+```
+
+#### Para subir manualmente (sem o `start-anom.ps1`)
+
+Os comandos brutos, caso prefira controlar API e UI em terminais separados:
+
+```powershell
+# Terminal 1 - backend (modo regex)
 $env:ANONYMIZER_API_USE_MOCK_CLIENT = "true"
 .\.venv\Scripts\python -m uvicorn scripts.run_api:app --host 127.0.0.1 --port 9000
 
@@ -228,7 +249,7 @@ src/anonymizer/         Core — detectores, redator, pipeline, política
 src/anonymizer_api/     FastAPI — routers, DB, jobs, containers, OPF manager
 apps/reviewer-ui/       Next.js — interface de revisão (PT-BR)
 policies/default.yaml   Política de redação (entity_type → estratégia)
-scripts/                CLIs + worker do subprocesso OPF + install.ps1 (Windows)
+scripts/                CLIs + worker OPF + install.ps1 / start-anom.ps1 (Windows)
 docs/                   project-context.md, pipeline.md, local_setup.md
 tests/                  pytest — 626 casos
 var/                    Estado runtime (NÃO versionado): quarantine/, output/, db
