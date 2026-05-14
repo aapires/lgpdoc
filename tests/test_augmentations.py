@@ -33,8 +33,8 @@ class TestNormalizeAllcaps:
 
     def test_three_word_name(self) -> None:
         assert (
-            normalize_allcaps_sequences("Sr. ALEXANDRE ANDRADE PIRES")
-            == "Sr. Alexandre Andrade Pires"
+            normalize_allcaps_sequences("Sr. RICARDO MENDES SOUZA")
+            == "Sr. Ricardo Mendes Souza"
         )
 
     def test_length_preserved(self) -> None:
@@ -61,19 +61,19 @@ class TestNormalizeAllcaps:
             == "Cliente: Mario Da Silva"
         )
 
-    def test_real_user_document(self) -> None:
+    def test_multi_label_document(self) -> None:
         text = (
             "Responsável: GUSTAVO SOARES\n"
-            "Cliente: ALEXANDRE ANDRADE PIRES\n"
-            "Nome do pai MARIO SERGIO PIRES\n"
-            "Nome da mãe REGINA CELIA ANDRADE PIRES"
+            "Cliente: RICARDO MENDES SOUZA\n"
+            "Nome do pai FERNANDO CARLOS DIAS\n"
+            "Nome da mãe LUCIA HELENA BARROS COSTA"
         )
         out = normalize_allcaps_sequences(text)
         # All names normalised so OPF can recognise them as people.
         assert "Gustavo Soares" in out
-        assert "Alexandre Andrade Pires" in out
-        assert "Mario Sergio Pires" in out
-        assert "Regina Celia Andrade Pires" in out
+        assert "Ricardo Mendes Souza" in out
+        assert "Fernando Carlos Dias" in out
+        assert "Lucia Helena Barros Costa" in out
         # Length preserved so span offsets are still valid against the original.
         assert len(out) == len(text)
 
@@ -90,40 +90,40 @@ class TestNormalizeAllcaps:
 
 class TestDetectBRLabeledNames:
     def test_cliente_label_allcaps(self) -> None:
-        spans = detect_br_labeled_names("Cliente: ALEXANDRE ANDRADE PIRES")
+        spans = detect_br_labeled_names("Cliente: RICARDO MENDES SOUZA")
         assert len(spans) == 1
         s = spans[0]
         assert s.entity_type == "private_person"
         assert s.source == "br_labeled_name"
         # Span captures only the name, not the label
-        assert "ALEXANDRE" in "Cliente: ALEXANDRE ANDRADE PIRES"[s.start:s.end]
-        assert "Cliente" not in "Cliente: ALEXANDRE ANDRADE PIRES"[s.start:s.end]
+        assert "RICARDO" in "Cliente: RICARDO MENDES SOUZA"[s.start:s.end]
+        assert "Cliente" not in "Cliente: RICARDO MENDES SOUZA"[s.start:s.end]
 
     def test_responsavel_label(self) -> None:
         spans = detect_br_labeled_names("Responsável: GUSTAVO SOARES")
         assert len(spans) == 1
 
     def test_titlecase_name(self) -> None:
-        spans = detect_br_labeled_names("Cliente: Alexandre Andrade Pires")
+        spans = detect_br_labeled_names("Cliente: Ricardo Mendes Souza")
         assert len(spans) == 1
 
     def test_nome_do_pai_no_colon(self) -> None:
-        spans = detect_br_labeled_names("Nome do pai MARIO SERGIO PIRES")
+        spans = detect_br_labeled_names("Nome do pai FERNANDO CARLOS DIAS")
         assert len(spans) == 1
 
     def test_does_not_bleed_into_next_field(self) -> None:
         # Two labels on the same line — should produce 2 separate matches,
         # neither one swallowing the next field.
         text = (
-            "Nome do pai MARIO SERGIO PIRES "
-            "Nome da mãe REGINA CELIA ANDRADE PIRES"
+            "Nome do pai FERNANDO CARLOS DIAS "
+            "Nome da mãe LUCIA HELENA BARROS COSTA"
         )
         spans = detect_br_labeled_names(text)
         assert len(spans) == 2
         first = text[spans[0].start:spans[0].end]
         second = text[spans[1].start:spans[1].end]
-        assert first == "MARIO SERGIO PIRES"
-        assert second == "REGINA CELIA ANDRADE PIRES"
+        assert first == "FERNANDO CARLOS DIAS"
+        assert second == "LUCIA HELENA BARROS COSTA"
 
     def test_name_does_not_cross_newline_into_section_header(self) -> None:
         # Real-world bug: with \s+ the name swallowed the next line.
@@ -134,10 +134,10 @@ class TestDetectBRLabeledNames:
         assert captured == "GUSTAVO SOARES"
 
     def test_name_does_not_cross_newline_into_next_label(self) -> None:
-        text = "Nome: ALEXANDRE ANDRADE PIRES\nCNPJ: 11.222.333/0001-81"
+        text = "Nome: RICARDO MENDES SOUZA\nCNPJ: 11.222.333/0001-81"
         spans = detect_br_labeled_names(text)
         assert any(
-            text[s.start:s.end] == "ALEXANDRE ANDRADE PIRES" for s in spans
+            text[s.start:s.end] == "RICARDO MENDES SOUZA" for s in spans
         )
         # And nothing captured ALEXANDRE...CNPJ across the newline
         assert not any(
@@ -175,15 +175,15 @@ class TestDetectBRLabeledNames:
             ), f"text={text!r} got={[text[s.start:s.end] for s in spans]}"
 
     def test_no_match_without_label(self) -> None:
-        spans = detect_br_labeled_names("ALEXANDRE ANDRADE PIRES went home")
+        spans = detect_br_labeled_names("RICARDO MENDES SOUZA went home")
         assert spans == []
 
     def test_many_labels_in_one_document(self) -> None:
         text = (
             "Responsável: GUSTAVO SOARES\n"
-            "Cliente: ALEXANDRE ANDRADE PIRES\n"
-            "Nome do pai MARIO SERGIO PIRES\n"
-            "Nome da mãe REGINA CELIA ANDRADE PIRES"
+            "Cliente: RICARDO MENDES SOUZA\n"
+            "Nome do pai FERNANDO CARLOS DIAS\n"
+            "Nome da mãe LUCIA HELENA BARROS COSTA"
         )
         spans = detect_br_labeled_names(text)
         assert len(spans) == 4
@@ -600,7 +600,7 @@ class TestMakeAugmentedClient:
     def test_catches_allcaps_names_via_both_paths(self) -> None:
         client = make_augmented_client(MockPrivacyFilterClient())
         text = (
-            "Cliente: ALEXANDRE ANDRADE PIRES\n"
+            "Cliente: RICARDO MENDES SOUZA\n"
             "Email: alex@example.org"
         )
         spans = client.detect(text)
@@ -639,16 +639,16 @@ def test_e2e_redaction_of_br_document() -> None:
 
     text = (
         "Responsável: GUSTAVO SOARES\n"
-        "Cliente: ALEXANDRE ANDRADE PIRES\n"
-        "Nome do pai MARIO SERGIO PIRES\n"
-        "Nome da mãe REGINA CELIA ANDRADE PIRES"
+        "Cliente: RICARDO MENDES SOUZA\n"
+        "Nome do pai FERNANDO CARLOS DIAS\n"
+        "Nome da mãe LUCIA HELENA BARROS COSTA"
     )
     spans = client.detect(text)
     result = Redactor(policy).redact(text, spans)
 
     # Every name from the input must be gone from the redacted text.
     assert "GUSTAVO" not in result.redacted_text
-    assert "ALEXANDRE" not in result.redacted_text
+    assert "RICARDO" not in result.redacted_text
     assert "MARIO SERGIO" not in result.redacted_text
     assert "REGINA" not in result.redacted_text
 

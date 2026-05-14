@@ -29,7 +29,7 @@ _Regras críticas e padrões que agentes de IA devem seguir ao implementar códi
 ## Technology Stack & Versions
 
 ### Core
-- **Python 3.11+** (venv local em `/Users/aapires/Projects/anonimizador/.venv`, hoje rodando 3.14)
+- **Python 3.11+** (venv local em `.venv/` na raiz do repo, hoje rodando 3.14)
 - **Node 20+** com **npm**
 - **macOS Darwin** (sandbox local; sem CUDA, OPF roda em CPU)
 

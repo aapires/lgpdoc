@@ -38,3 +38,8 @@ var/
 examples/*
 !examples/synthetic_contract.docx
 
+# Loose Office docs at the repo root (scratch, drafts, prompts) — never publish
+/*.docx
+/*.doc
+/*.pdf
+
