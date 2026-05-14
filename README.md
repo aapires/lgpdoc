@@ -37,7 +37,11 @@ Roda inteiramente local: nenhum byte do documento sai da máquina. A única comu
 
 ---
 
-## Setup rápido (macOS Big Sur ou mais novo)
+## Setup
+
+Escolha o caminho conforme seu sistema operacional.
+
+### macOS Big Sur ou mais novo
 
 Uma linha:
 
@@ -46,7 +50,7 @@ curl -fsSL https://raw.githubusercontent.com/aapires/lgpdoc/main/bootstrap.sh -o
 bash /tmp/bootstrap.sh
 ```
 
-O `bootstrap.sh` instala Homebrew (se faltar), Python 3.11, Node 20, Tesseract, Poppler, clona o repositório em `~/lgpdoc` e instala todas as dependências. Em macOS Big Sur a primeira execução demora ~10 min; em Catalina pode chegar a 30–60 min porque várias dependências compilam do código-fonte.
+O `bootstrap.sh` instala Homebrew (se faltar), Python 3.11, Node 20, Tesseract, Poppler, clona o repositório em `~/lgpdoc` e instala todas as dependências. Em Big Sur a primeira execução demora ~10 min; em Catalina pode chegar a 30–60 min porque várias dependências compilam do código-fonte.
 
 Para subir a aplicação:
 
@@ -58,7 +62,118 @@ cd ~/lgpdoc
 
 Abra `http://localhost:3000/jobs`.
 
-### Setup manual (Linux ou se preferir)
+### Windows 10 / 11
+
+Não há instalador automático no Windows — você instala três coisas, clona o repo e sobe em dois terminais. Plano: ~15–20 min na primeira vez. Recomendo começar pelo **modo `--mock`** (só regex, sem download de modelo) para validar que tudo funciona antes de baixar os ~3 GB do OPF.
+
+#### 1. Pré-requisitos (instaladores oficiais)
+
+Baixe e instale, nessa ordem:
+
+1. **Python 3.11 ou 3.12** → [python.org/downloads](https://www.python.org/downloads/windows/)
+   - **Marque "Add python.exe to PATH"** na primeira tela do instalador. É a checkbox mais importante.
+2. **Node.js 20 LTS** → [nodejs.org](https://nodejs.org/) — escolha o instalador "LTS".
+3. **Git for Windows** → [git-scm.com/download/win](https://git-scm.com/download/win) — traz junto o **Git Bash**, que vamos usar para clonar e (opcionalmente) rodar o script de start.
+
+Para confirmar que tudo entrou no PATH, abra um **novo** PowerShell e rode:
+
+```powershell
+python --version    # deve mostrar 3.11.x ou 3.12.x
+node --version      # deve mostrar v20.x
+git --version
+```
+
+Se algum comando não for reconhecido, feche e abra o PowerShell de novo. Se ainda assim falhar, o instalador não adicionou ao PATH — reinstale marcando a opção.
+
+#### 2. Clone e setup
+
+No PowerShell, da pasta onde você quer guardar o projeto (ex.: `C:\Users\<seunome>\Projects`):
+
+```powershell
+git clone https://github.com/aapires/lgpdoc.git
+cd lgpdoc
+
+# Cria o venv
+python -m venv .venv
+
+# Atualiza o pip dentro do venv
+.\.venv\Scripts\python -m pip install --upgrade pip
+
+# Instala o backend em modo regex (leve — recomendado para o primeiro teste)
+.\.venv\Scripts\pip install -e ".[dev,api,ocr]"
+
+# Instala o frontend
+cd apps\reviewer-ui
+npm install
+cd ..\..
+```
+
+> 💡 No Windows, o venv vive em `.venv\Scripts\` (e não em `.venv/bin/` como no macOS/Linux). Os comandos abaixo usam o caminho do Windows.
+
+#### 3. Subir a aplicação (sem OPF — modo `--mock`)
+
+Você precisa de **dois terminais PowerShell** abertos em paralelo, ambos na pasta `lgpdoc`.
+
+**Terminal 1 — backend (API FastAPI):**
+
+```powershell
+$env:ANONYMIZER_API_USE_MOCK_CLIENT = "true"
+.\.venv\Scripts\python -m uvicorn scripts.run_api:app --host 127.0.0.1 --port 9000
+```
+
+Espere a mensagem `Uvicorn running on http://127.0.0.1:9000`.
+
+**Terminal 2 — frontend (Next.js):**
+
+```powershell
+cd apps\reviewer-ui
+npm run dev
+```
+
+Espere `ready - started server on 0.0.0.0:3000`. Abra `http://localhost:3000/jobs` no navegador.
+
+Para encerrar, dê `Ctrl+C` nos dois terminais.
+
+#### 4. (Opcional) Ligar o OPF
+
+O OPF é semântico — pega nomes em narrativa sem precisar de gatilhos. Mas baixa ~3 GB na primeira execução e consome ~3 GB de RAM enquanto carregado. Só vale a pena se a máquina tiver pelo menos **8 GB de RAM livres**.
+
+```powershell
+.\.venv\Scripts\pip install -e ".[dev,api,ocr,ml]"
+```
+
+E suba a API **sem** o `ANONYMIZER_API_USE_MOCK_CLIENT=true` do passo anterior:
+
+```powershell
+.\.venv\Scripts\python -m uvicorn scripts.run_api:app --host 127.0.0.1 --port 9000
+```
+
+Na UI, o toggle "OPF" no header carrega/descarrega o modelo sob demanda.
+
+#### 5. (Opcional) OCR para PDFs escaneados e imagens
+
+Sem essas duas dependências, PDFs escaneados produzem texto vazio e uploads de imagem (`.png`, `.jpg`) são recusados com erro 400.
+
+- **Tesseract OCR** — instalador UB-Mannheim: [github.com/UB-Mannheim/tesseract/wiki](https://github.com/UB-Mannheim/tesseract/wiki).
+  - Durante a instalação, em "Additional language data", **marque "Portuguese"**.
+  - Adicione `C:\Program Files\Tesseract-OCR` ao PATH.
+- **Poppler** (binários do PDF) — baixe o release mais recente em [github.com/oschwartz10612/poppler-windows/releases](https://github.com/oschwartz10612/poppler-windows/releases).
+  - Descompacte em `C:\poppler` (ou outro lugar) e adicione `C:\poppler\Library\bin` ao PATH.
+
+Confirme rodando `tesseract --version` e `pdftoppm -v` num novo PowerShell.
+
+#### Alternativa: usar o `start-anom.sh` no Git Bash
+
+Se preferir um único comando, abra o **Git Bash** (instalado junto com o Git for Windows) na pasta `lgpdoc` e rode:
+
+```bash
+./start-anom.sh --mock      # modo regex
+./start-anom.sh             # com OPF (precisa do extra [ml] instalado)
+```
+
+O script foi escrito para macOS/Linux, mas funciona no Git Bash. Se algum comando reclamar de fim de linha (`CRLF`), rode `git config --global core.autocrlf input` e clone o repositório de novo.
+
+### Linux (Ubuntu/Debian) — setup manual
 
 ```bash
 git clone https://github.com/aapires/lgpdoc.git
@@ -69,7 +184,7 @@ python3.11 -m venv .venv
 .venv/bin/pip install -e ".[dev,api,ocr]"      # sem [ml] = só regex
 .venv/bin/pip install -e ".[dev,api,ocr,ml]"   # com OPF (~3 GB de modelo na 1ª exec)
 
-# OCR system deps (Linux)
+# OCR system deps
 sudo apt install tesseract-ocr tesseract-ocr-por poppler-utils
 
 # Frontend
@@ -167,6 +282,7 @@ Os dois precisam estar verdes. Não há CI configurado — é responsabilidade l
 ## Limitações conhecidas
 
 - **macOS Catalina (10.15) ou anterior**: o `torch` parou de publicar wheels para essa versão. O OPF não roda; use `./start-anom.sh --mock` (regex apenas).
+- **Windows**: o `bootstrap.sh` não cobre Windows — o setup é manual (instaladores de Python, Node e Git for Windows, depois `pip install` e `npm install`). Veja a seção [Windows 10 / 11](#windows-10--11). O `start-anom.sh` funciona via Git Bash; alternativamente suba API e UI em dois terminais PowerShell.
 - **Sem suporte a `.doc` legado** (Word 97-2003 binário) — converta para `.docx` antes.
 - **DOCX não expõe número de página** — `page` fica `null` para esse formato.
 - **OCR opcional** — sem `[ocr]` instalado, PDFs escaneados produzem blocos vazios e uploads de imagem são recusados com 400.
